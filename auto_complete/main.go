@@ -44,7 +44,7 @@ func createManualEncryptionClient(c *mongo.Client, kp map[string]map[string]inte
 
 func createAutoEncryptionClient(c string, ns string, kms map[string]map[string]interface{}, tlsOps map[string]*tls.Config, s bson.M) (*mongo.Client, error) {
 	extraOptions := map[string]interface{}{
-		"cryptSharedLibPath":     "/lib/mongo_crypt_v1.so",
+		"cryptSharedLibPath":     "/home/ubuntu/crypt_shared/lib/mongo_crypt_v1.so",
 		"cryptSharedLibRequired": true,
 	}
 	autoEncryptionOpts := options.AutoEncryption().

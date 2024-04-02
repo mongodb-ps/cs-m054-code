@@ -258,7 +258,7 @@ def main():
     },
     crypt_shared_lib_required = True,
     mongocryptd_bypass_spawn = True,
-    crypt_shared_lib_path = '/lib/mongo_crypt_v1.so'
+    crypt_shared_lib_path = '/home/ubuntu/crypt_shared/lib/mongo_crypt_v1.so'
   )
 
   secure_client, err = mdb_client(connection_string, auto_encryption_opts=auto_encryption)
