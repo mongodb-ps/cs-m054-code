@@ -1,4 +1,4 @@
-mongosh "mongodb://mongoadmin:passwordone@<STUDENTNAME>.mdbps.internal:27017/?replicaSet=rs0" --tls --tlsCAFile /home/ubuntu/ca.cert 
+mongosh "mongodb://mongoadmin:passwordone@<STUDENTNAME>02.dbservers.mdbps.internal:27017/?replicaSet=rs0" --tls --tlsCAFile /home/ubuntu/ca.cert 
 
 // Create Index
 db.getSiblingDB("__encryption").getCollection("__keyVault").createIndex(
@@ -18,7 +18,7 @@ db.getSiblingDB("__encryption").getCollection("__keyVault").createIndex(
 // Create DEK
 const provider = {
  "kmip": { // <-- KMS provider name
-    "endpoint": "csfle-kmip-<STUDENTNAME>.mdbps.internal"
+    "endpoint": "<STUDENTNAME>01.kmipservers.mdbps.internal"
  }
 };
 
@@ -36,7 +36,7 @@ const autoEncryptionOpts = {
  tlsOptions: tlsOptions
 };
 
-encryptedClient = Mongo("mongodb://mongoadmin:passwordone@<STUDENTNAME>.mdbps.internal:27017/?replicaSet=rs0&tls=true&tlsCAFile=%2Fhome%2Fubuntu%2Fca.cert", autoEncryptionOpts);
+encryptedClient = Mongo("mongodb://mongoadmin:passwordone@<STUDENTNAME>02.dbservers.mdbps.internal:27017/?replicaSet=rs0&tls=true&tlsCAFile=%2Fhome%2Fubuntu%2Fca.cert", autoEncryptionOpts);
 
 keyVault = encryptedClient.getKeyVault();
 
@@ -120,7 +120,7 @@ const autoEncryptionOpts = {
  tlsOptions: tlsOptions
 }
 
-encryptedClient = Mongo("mongodb://mongoadmin:passwordone@<STUDENTNAME>.mdbps.internal:27017/?replicaSet=rs0&tls=true&tlsCAFile=%2Fhome%2Fubuntu%2Fca.cert", autoEncryptionOpts)
+encryptedClient = Mongo("mongodb://mongoadmin:passwordone@<STUDENTNAME>02.dbservers.mdbps.internal:27017/?replicaSet=rs0&tls=true&tlsCAFile=%2Fhome%2Fubuntu%2Fca.cert", autoEncryptionOpts)
 
 keyVault = encryptedClient.getKeyVault()
 
