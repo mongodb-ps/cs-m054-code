@@ -1,4 +1,4 @@
-# CSFLE Workshop Skeleton
+# CSFLE Workshop Skeleton - M054 Tradecraft Mission
 
 This repository contains the skeleton code for a workshop on client-side field level encryption (CSFLE). The workshop is intended for anyone who is interested in learning how to use CSFLE to enhance the security of their MongoDB deployments.
 
