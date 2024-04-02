@@ -329,9 +329,9 @@ func main() {
 		exitCode = 1
 		return
 	}
-	fmt.Print(result.InsertedID)
+	fmt.Println(result.InsertedID)
 
-	err = encryptedColl.FindOne(context.TODO(), bson.M{"name.firstName": firstname}).Decode(&findResult)
+	err = encryptedColl.FindOne(context.TODO(), bson.M{"name.firstName": name["firstName"]}).Decode(&findResult)
 	if err != nil {
 		fmt.Printf("MongoDB find error: %s\n", err)
 		exitCode = 1
