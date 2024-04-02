@@ -12,8 +12,8 @@ import names
 import sys
 
 # IN VALUES HERE!
-STUDENTNAME = "proud-hawk"
-MDB_PASSWORD = "password123"
+STUDENTNAME = 
+MDB_PASSWORD = 
 APP_USER = "app_user"
 CA_PATH = "/home/ubuntu/ca.cert"
 

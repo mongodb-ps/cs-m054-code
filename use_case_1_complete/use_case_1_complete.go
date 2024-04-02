@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	STUDENTNAME      = "proud-hawk"
-	MDB_PASSWORD = "password123"
+	STUDENTNAME  = 
+	MDB_PASSWORD = 
 )
 
 func createClient(c string) (*mongo.Client, error) {
