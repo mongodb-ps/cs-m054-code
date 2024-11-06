@@ -63,7 +63,7 @@ public class App {
     static Logger logger = LoggerFactory.getLogger("AsyncApp");
     
     // VALUES IN HERE!
-    static String STUDENTNAME = "";
+    static String "";
     static String MDB_PASSWORD = "";
     static String APP_USER = "app_user";
 
@@ -302,7 +302,7 @@ public class App {
 
         // Obviously this should not be hardcoded
         String connectionString = String.format(
-            "mongodb://%s:%s@%s02.dbservers.mdbps.internal/?serverSelectionTimeoutMS=5000&tls=true",
+            "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true",
             APP_USER, MDB_PASSWORD, STUDENTNAME
         );
   

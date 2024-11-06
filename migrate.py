@@ -14,11 +14,11 @@ except ImportError as e:
   print(e)
   sys.exit(-1)
 
-# IN VALUES HERE!
-STUDENTNAME = 
-MDB_PASSWORD = 
-APP_USER = "app_user"
-CA_PATH = "/home/ubuntu/ca.cert"
+# PUT VALUES HERE!
+
+MDB_PASSWORD = <UPDATE_HERE> 
+APP_USER = <UPDATE_HERE>
+CA_PATH = <UPDATE_HERE>
 
 def mdb_client(connection_string, auto_encryption_opts=None):
   """ Returns a MongoDB client instance
@@ -87,10 +87,10 @@ def create_employee():
 def main():
 
   # Obviously this should not be hardcoded
-  connection_string = "mongodb://%s:%s@%s02.dbservers.mdbps.internal/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
+  connection_string = "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(APP_USER),
     quote_plus(MDB_PASSWORD),
-    STUDENTNAME,
+
     quote_plus(CA_PATH)
   )
 
@@ -197,8 +197,8 @@ def main():
     schema_map = {schema_map},
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/home/ubuntu/ca.cert",
-        "tlsCertificateKeyFile": "/home/ubuntu/server.pem"
+        "tlsCAFile": "/data/pki/ca.pem",
+        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
       }
     },
     crypt_shared_lib_required = True,

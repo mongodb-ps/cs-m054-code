@@ -1,4 +1,4 @@
-// run via: mongosh "mongodb://mongoadmin:passwordone@<STUDENTNAME>.mdbps.internal:27017/?replicaSet=rs0" --tls --tlsCAFile /home/ubuntu/ca.cert --eval 'load("second_day.js")'
+// run via: mongosh "mongodb://mongoadmin:passwordone@<STUDENTNAME>.mdbps.internal:27017/?replicaSet=rs0" --tls --tlsCAFile /data/pki/ca.pem --eval 'load("second_day.js")'
 
 // Create Index
 db.getSiblingDB("__encryption").getCollection("__keyVault").createIndex(
@@ -21,14 +21,14 @@ db.getSiblingDB("__encryption").getCollection("__keyVault").createIndex(
 // Create DEK
 const provider = {
  "kmip": { // <-- KMS provider name
-    "endpoint": "csfle-kmip-<STUDENTNAME>.mdbps.internal"
+    "endpoint": <UPDATE_HERE>
  }
 };
 
 const tlsOptions = {
   kmip: {
-    tlsCAFile: "/home/ubuntu/ca.cert",
-    tlsCertificateKeyFile: "/home/ubuntu/server.pem"
+    tlsCAFile: "/data/pki/ca.pem",
+    tlsCertificateKeyFile: "/data/pki/client-0.pem"
   }
 };
 

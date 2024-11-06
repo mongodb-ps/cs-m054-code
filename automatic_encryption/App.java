@@ -283,13 +283,13 @@ public class App {
         App app = new App();
 
         // VALUES IN HERE!
-        String STUDENTNAME = "";
+        String "";
         String MDB_PASSWORD = "";
         String APP_USER = "app_user";
 
         // Obviously this should not be hardcoded
         String connectionString = String.format(
-            "mongodb://%s:%s@%s02.dbservers.mdbps.internal/?serverSelectionTimeoutMS=5000&tls=true",
+            "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true",
             APP_USER, MDB_PASSWORD, STUDENTNAME
         );
   

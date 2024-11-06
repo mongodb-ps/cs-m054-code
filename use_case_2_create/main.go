@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	STUDENTNAME = 
+	
 	MDB_PASSWORD =
 )
 
@@ -136,7 +136,7 @@ func main() {
 	provider := "kmip"
 	kmsProvider := map[string]map[string]interface{}{
 		provider: {
-			"endpoint": kmipEndpoint,
+			"endpoint": <UPDATE_HERE>
 		},
 	}
 	cmk := map[string]interface{}{
@@ -154,8 +154,8 @@ func main() {
 	// Set the KMIP TLS options
 	kmsTLSOptions := make(map[string]*tls.Config)
 	tlsOptions := map[string]interface{}{
-		"tlsCAFile": "/home/ubuntu/ca.cert",
-		"tlsCertificateKeyFile": "/home/ubuntu/server.pem",
+		"tlsCAFile": "/data/pki/ca.pem",
+		"tlsCertificateKeyFile": "/data/pki/client-0.pem",
 	}
 	kmipTLSConfig, err = options.BuildTLSConfig(tlsOptions)
 	if err != nil {

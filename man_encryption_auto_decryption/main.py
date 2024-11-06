@@ -17,11 +17,11 @@ except ImportError as e:
   exit(1)
 
 
-# IN VALUES HERE!
-STUDENTNAME = 
-MDB_PASSWORD = 
-APP_USER = "app_user"
-CA_PATH = "/home/ubuntu/ca.cert"
+# PUT VALUES HERE!
+
+MDB_PASSWORD = <UPDATE_HERE> 
+APP_USER = <UPDATE_HERE>
+CA_PATH = <UPDATE_HERE>
 
 def check_python_version() -> str | None:
   """Checks if the current Python version is supported.
@@ -66,10 +66,10 @@ def main():
     exit(1)
 
   # Obviously this should not be hardcoded
-  connection_string = "mongodb://%s:%s@%s02.dbservers.mdbps.internal/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
+  connection_string = "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(APP_USER),
     quote_plus(MDB_PASSWORD),
-    STUDENTNAME,
+
     quote_plus(CA_PATH)
   )
 
@@ -84,7 +84,7 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": f"{STUDENTNAME}01.kmipservers.mdbps.internal"
+      "endpoint": <UPDATE_HERE>
     }
   }
   
@@ -107,8 +107,8 @@ def main():
     CodecOptions(uuid_representation=STANDARD),
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/home/ubuntu/ca.cert",
-        "tlsCertificateKeyFile": "/home/ubuntu/server.pem"
+        "tlsCAFile": "/data/pki/ca.pem",
+        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
       }
     }
   )
@@ -120,8 +120,8 @@ def main():
     bypass_auto_encryption = True, # we do not want to autoencrypt
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/home/ubuntu/ca.cert",
-        "tlsCertificateKeyFile": "/home/ubuntu/server.pem"
+        "tlsCAFile": "/data/pki/ca.pem",
+        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
       }
     },
     crypt_shared_lib_required = True,

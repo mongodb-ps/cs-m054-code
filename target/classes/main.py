@@ -13,11 +13,11 @@ from urllib.parse import quote_plus
 import names
 import sys
 
-# IN VALUES HERE!
-STUDENTNAME = 
-MDB_PASSWORD = 
-APP_USER = "app_user"
-CA_PATH = "/home/ubuntu/ca.cert"
+# PUT VALUES HERE!
+
+MDB_PASSWORD = <UPDATE_HERE> 
+APP_USER = <UPDATE_HERE>
+CA_PATH = <UPDATE_HERE>
 
 def mdb_client(connection_string, auto_encryption_opts=None):
   """ Returns a MongoDB client instance
@@ -70,7 +70,7 @@ def get_employee_key(client, altName, provider_name, keyId):
   employee_key_id = client.get_key_by_alt_name(str(altName))
   if employee_key_id == None:
     try:
-      master_key = {"keyId": keyId, "endpoint": f"{STUDENTNAME}01.kmipservers.mdbps.internal"}
+      master_key = {"keyId": keyId, "endpoint": <UPDATE_HERE>
       employee_key_id = client.create_data_key(kms_provider=provider_name, master_key=master_key, key_alt_names=[str(altName)])
     except EncryptionError as e:
       return None, f"ClientEncryption error: {e}"
@@ -81,10 +81,10 @@ def get_employee_key(client, altName, provider_name, keyId):
 def main():
 
   # Obviously this should not be hardcoded
-  connection_string = "mongodb://%s:%s@%s02.dbservers.mdbps.internal/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
+  connection_string = "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(APP_USER),
     quote_plus(MDB_PASSWORD),
-    STUDENTNAME,
+
     quote_plus(CA_PATH)
   )
 
@@ -99,7 +99,7 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": f"{STUDENTNAME}01.kmipservers.mdbps.internal"
+      "endpoint": <UPDATE_HERE>
     }
   }
   
@@ -121,8 +121,8 @@ def main():
     CodecOptions(uuid_representation=STANDARD),
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/home/ubuntu/ca.cert",
-        "tlsCertificateKeyFile": "/home/ubuntu/server.pem"
+        "tlsCAFile": "/data/pki/ca.pem",
+        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
       }
     }
   )
@@ -235,8 +235,8 @@ def main():
     schema_map = schema_map,
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/home/ubuntu/ca.cert",
-        "tlsCertificateKeyFile": "/home/ubuntu/server.pem"
+        "tlsCAFile": "/data/pki/ca.pem",
+        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
       }
     },
     crypt_shared_lib_required = True,
