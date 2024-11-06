@@ -1,4 +1,4 @@
-// run via: mongosh "mongodb://mongoadmin:passwordone@<STUDENTNAME>.mdbps.internal:27017/?replicaSet=rs0" --tls --tlsCAFile /data/pki/ca.pem --eval 'load("second_day.js")'
+// run via: mongosh "mongodb://sdeadmin:s3cr3t%21@mongodb-0:27017/?replicaSet=rs0" --tls --tlsCAFile /data/pki/ca.pem --eval 'load("second_day.js")'
 
 // Create Index
 db.getSiblingDB("__encryption").getCollection("__keyVault").createIndex(
@@ -15,20 +15,17 @@ db.getSiblingDB("__encryption").getCollection("__keyVault").createIndex(
   }
 );
 
-
-
-
 // Create DEK
 const provider = {
  "kmip": { // <-- KMS provider name
-    "endpoint": <UPDATE_HERE>
+    "endpoint": "kmip0:5696"
  }
 };
 
 const tlsOptions = {
   kmip: {
     tlsCAFile: "/data/pki/ca.pem",
-    tlsCertificateKeyFile: "/data/pki/client-0.pem"
+    tlsCertificateKeyFile: "/data/pki/server.pem"
   }
 };
 
@@ -39,7 +36,7 @@ const autoEncryptionOpts = {
  tlsOptions: tlsOptions
 };
 
-encryptedClient = Mongo("mongodb://mongoadmin:passwordone@<STUDENTNAME>.mdbps.internal:27017/?replicaSet=rs0&tls=true&tlsCAFile=%2Fhome%2Fubuntu%2Fca.cert", autoEncryptionOpts);
+encryptedClient = Mongo("mongodb://sdeadmin:s3cr3t%21@mongodb-0:27017/?replicaSet=rs0&tls=true&tlsCAFile=%data%pki%2Fca.pem", autoEncryptionOpts);
 
 keyVault = encryptedClient.getKeyVault();
 
@@ -54,9 +51,7 @@ keyVault.createKey(
 // Retrieve all the keys
 keyVault.getKeys();
 
-
 // Create User and Role
-//use admin;
 db.getSiblingDB('admin').createRole({
  "role": "cryptoClient",
  "privileges": [
@@ -72,7 +67,7 @@ db.getSiblingDB('admin').createRole({
 });
 db.getSiblingDB('admin').createUser({
  "user": "app_user",
- "pwd": "password123",
+ "pwd": "SuperP@ssword123!",
  "roles": ["cryptoClient", {'role': "readWrite", 'db': 'companyData'} ]
 });
 

@@ -122,7 +122,6 @@ def main():
   connection_string = "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(APP_USER),
     quote_plus(MDB_PASSWORD),
-
     quote_plus(CA_PATH)
   )
 
