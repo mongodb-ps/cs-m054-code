@@ -185,6 +185,17 @@ def main():
     print(err)
     sys.exit(1)
 
+  # Create role and user
+  client.admin.command("createRole", "cryptoClient",  privileges=[
+   {
+      "resource": {
+        "db": keyvault_db,
+        "collection": keyvault_coll
+      },
+      "actions": [ "find" ]
+    }
+  ])
+  client.admin.command("createUser", APP_USER, MDB_PASSWORD, roles=["cryptoClient"])
 
   # Instantiate our ClientEncryption object
   client_encryption = ClientEncryption(
