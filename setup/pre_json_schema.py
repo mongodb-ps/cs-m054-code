@@ -20,6 +20,8 @@ except ImportError as e:
 
 MDB_PASSWORD = "SuperP@ssword123!"
 APP_USER = "app_user"
+SDE_PASSWORD = "s3cr3t!"
+SDE_USER = "sdeadmin"
 CA_PATH = "/data/pki/ca.pem"
 
 def check_python_version() -> str | None:
@@ -155,8 +157,8 @@ def main():
 
   # Obviously this should not be hardcoded
   connection_string = "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
-    quote_plus(APP_USER),
-    quote_plus(MDB_PASSWORD),
+    quote_plus(SDE_USER),
+    quote_plus(SDE_PASSWORD),
     quote_plus(CA_PATH)
   )
 
@@ -192,7 +194,8 @@ def main():
         "db": keyvault_db,
         "collection": keyvault_coll
       },
-      "actions": [ "find" ]
+      "actions": [ "find" ],
+      "roles": []
     }
   ])
   client.admin.command("createUser", APP_USER, MDB_PASSWORD, roles=["cryptoClient"])
