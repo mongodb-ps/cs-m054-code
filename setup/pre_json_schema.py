@@ -199,7 +199,7 @@ def main():
     ],
     roles=[]
   )
-  client.admin.command("createUser", user=APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient"])
+  client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient"])
 
   # Instantiate our ClientEncryption object
   client_encryption = ClientEncryption(
