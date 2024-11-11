@@ -240,12 +240,14 @@ def main():
   try:
 
     # Retrieve the DEK UUID
-    data_key_id_1 = client_encryption.get_key_by_alt_name("dataKey1")["_id"]
+    data_key_id_1 = client_encryption.get_key_by_alt_name("dataKey1")
     if data_key_id_1 is None:
       data_key_id_1, err = make_dek(client_encryption, "dataKey1", provider, "1")
       if err is not None:
         print("Failed to find DEK")
         sys.exit()
+    else:
+      data_key_id_1 = data_key_id_1["_id"]
 
     # Do deterministic fields
     payload["name"]["firstName"] = client_encryption.encrypt(payload["name"]["firstName"], Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Deterministic, data_key_id_1)
