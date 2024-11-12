@@ -17,8 +17,8 @@ except ImportError as e:
 # PUT VALUES HERE!
 
 MDB_PASSWORD = <UPDATE_HERE> 
-APP_USER = <UPDATE_HERE>
-CA_PATH = <UPDATE_HERE>
+APP_USER = "app_user"
+CA_PATH = "/data/pki/ca.pem"
 
 def mdb_client(connection_string, auto_encryption_opts=None):
   """ Returns a MongoDB client instance
@@ -87,7 +87,7 @@ def create_employee():
 def main():
 
   # Obviously this should not be hardcoded
-  connection_string = "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
+  connection_string = "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(APP_USER),
     quote_plus(MDB_PASSWORD),
 

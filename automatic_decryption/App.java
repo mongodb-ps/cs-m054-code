@@ -242,7 +242,7 @@ public class App {
 
         // Obviously this should not be hardcoded
         String connectionString = String.format(
-            "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true",
+            "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true",
             APP_USER, MDB_PASSWORD, STUDENTNAME
         );
   

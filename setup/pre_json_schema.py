@@ -156,7 +156,7 @@ def main():
     exit(1)
 
   # Obviously this should not be hardcoded
-  connection_string = "mongodb://%s:%s@mongodb-0/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
+  connection_string = "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(SDE_USER),
     quote_plus(SDE_PASSWORD),
     quote_plus(CA_PATH)
