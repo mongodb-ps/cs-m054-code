@@ -145,7 +145,7 @@ def main():
     ],
     roles=[]
   )
-  client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient"])
+  client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient", {"role": "readWrite", "db": "companyData"}])
 
   firstname = names.get_first_name()
   lastname = names.get_last_name()
