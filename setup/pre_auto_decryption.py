@@ -255,6 +255,10 @@ def main():
       }
     }
   }
+  db = client["companyData"]
+  db.create_collection("employee", validator={
+    "$jsonSchema": schema_map["companyData.employee"]
+})
 
   auto_encryption = AutoEncryptionOpts(
     kms_provider,

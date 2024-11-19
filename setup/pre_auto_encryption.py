@@ -157,10 +157,71 @@ def main():
     }
   )
 
-  _, err = make_dek(client_encryption, "dataKey1", provider, "1")
+  data_key_id_1, err = make_dek(client_encryption, "dataKey1", provider, "1")
   if err is not None:
     print("Failed to find DEK")
     sys.exit()
+
+  db = client["companyData"]
+  db.create_collection("employee", validator={
+    "$jsonSchema": {
+      "bsonType": "object",
+      "encryptMetadata": {
+        "keyId": [data_key_id_1],
+        "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
+      },
+      "properties": {
+        "name": {
+          "bsonType": "object",
+          "properties": {
+            "firstName": {
+              "encrypt" : {
+                "bsonType": "string",
+                "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+              }
+            },
+            "lastName": {
+              "encrypt" : {
+                "bsonType": "string",
+                "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+              }
+            },
+            "otherNames": {
+              "encrypt" : {
+                "bsonType": "string"
+              }
+            }
+          }
+        },
+        "address": {
+          "encrypt": {
+            "bsonType": "object"
+          }
+        },
+        "dob": {
+          "encrypt": {
+            "bsonType": "date"
+          }
+        },
+        "phoneNumber": {
+          "encrypt": {
+            "bsonType": "string"
+          }
+        },
+        "salary": {
+          "encrypt": {
+            "bsonType": "double"
+          }
+        },
+        "taxIdentifier": {
+          "encrypt": {
+            "bsonType": "string"
+          }
+        }
+      }
+    }
+  }
+)
 
 if __name__ == "__main__":
   main()
