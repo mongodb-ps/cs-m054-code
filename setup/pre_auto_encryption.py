@@ -57,6 +57,40 @@ def mdb_client(connection_string: str, auto_encryption_opts: tuple[dict | None] 
   except (ServerSelectionTimeoutError, ConnectionFailure) as e:
     return None, f"Cannot connect to database, please check settings in config file: {e}"
 
+def make_dek(client: MongoClient, altName: str, provider_name: str, keyId: str) -> tuple[str | None, str | None]:
+  """ Return a DEK's UUID for a give KeyAltName. Creates a new DEK if the DEK is not found.
+  
+  Queries a key vault for a particular KeyAltName and returns the UUID of the DEK, if found.
+  If not found, the UUID and Key Provider object and CMK ID are used to create a new DEK
+
+  Parameters
+  -----------
+    client: mongo.ClientEncryption
+      An instantiated ClientEncryption instance that has access to the key vault
+    altName: string
+      The KeyAltName of the UUID to find
+    provider_name: string
+      The name of the key provider. "aws", "gcp", "azure", "kmip", or "local"
+    keyId: string
+      The key ID for the Customer Master Key (CMK)
+  Return
+  -----------
+    employee_key_id: UUID
+      The UUID of the DEK
+    error: error
+      Error message or None of successful
+  """
+  
+  employee_key_id = client.get_key_by_alt_name(str(altName))
+  if employee_key_id == None:
+    try:
+      master_key = {"keyId": keyId, "endpoint": "kmip-0:5696"}
+      employee_key_id = client.create_data_key(kms_provider=provider_name, master_key=master_key, key_alt_names=[str(altName)])
+    except EncryptionError as e:
+      return None, f"ClientEncryption error: {e}"
+  else:
+    employee_key_id = employee_key_id["_id"]
+  return employee_key_id, None
 
 def main():
 
@@ -77,6 +111,17 @@ def main():
   # Declare or key vault namespce
   keyvault_db = "__encryption"
   keyvault_coll = "__keyVault"
+  keyvault_namespace = f"{keyvault_db}.{keyvault_coll}"
+
+  # declare our key provider type
+  provider = "kmip"
+
+  # declare our key provider attributes
+  kms_provider = {
+    provider: {
+      "endpoint": "kmip-0:5696"
+    }
+  }
 
   # instantiate our MongoDB Client object
   client, err = mdb_client(connection_string)
@@ -97,6 +142,25 @@ def main():
     roles=[]
   )
   client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient", {"role": "readWrite", "db": "companyData"}])
+
+  # Instantiate our ClientEncryption object
+  client_encryption = ClientEncryption(
+    kms_provider,
+    keyvault_namespace,
+    client,
+    CodecOptions(uuid_representation=STANDARD),
+    kms_tls_options = {
+      "kmip": {
+        "tlsCAFile": "/data/pki/ca.pem",
+        "tlsCertificateKeyFile": "/data/pki/server.pem"
+      }
+    }
+  )
+
+  _, err = make_dek(client_encryption, "dataKey1", provider, "1")
+  if err is not None:
+    print("Failed to find DEK")
+    sys.exit()
 
 if __name__ == "__main__":
   main()
