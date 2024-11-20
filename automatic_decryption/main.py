@@ -2,6 +2,7 @@ try:
   from os import path
   from sys import version_info
   from bson.binary import STANDARD, Binary, UUID_SUBTYPE
+  from bson import ObjectId
   from bson.codec_options import CodecOptions
   from datetime import datetime
   from pymongo import MongoClient
