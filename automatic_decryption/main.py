@@ -190,7 +190,7 @@ def main():
   auto_encryption = AutoEncryptionOpts(
     kms_provider,
     keyvault_namespace,
-    schema_map = {schema_map},
+    schema_map = schema_map,
     kms_tls_options = {
       "kmip": {
         "tlsCAFile": "/data/pki/ca.pem",
