@@ -323,7 +323,7 @@ public class App {
             // Get auto encryption opps
             Map<String, Object> extraOptions = new HashMap<String, Object>();
             extraOptions.put("mongocryptdBypassSpawn", true);
-            extraOptions.put("cryptSharedLibPath", "/root/crypt_shared/lib/mongo_crypt_v1.so");
+            extraOptions.put("cryptSharedLibPath", "/data/lib/mongo_crypt_v1.so");
             extraOptions.put("cryptSharedLibRequired", true);
 
             AutoEncryptionSettings autoEncryptionSettings = AutoEncryptionSettings.builder()
