@@ -222,15 +222,5 @@ def main():
   except EncryptionError as e:
     print(f"Encryption error: {e}")
 
-  try:
-
-    # PUT CODE HERE TO PERFORM A RANGE QUERY ON THE `name.firstName` field
-    decrypted_docs = # use a find_one
-
-    for doc in decrypted_docs:
-      print(doc)
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
-
 if __name__ == "__main__":
   main()
