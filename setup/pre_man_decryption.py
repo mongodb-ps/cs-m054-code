@@ -1,37 +1,21 @@
 try:
   from os import path
-  from sys import version_info
-  from bson.binary import STANDARD, Binary, UUID_SUBTYPE
+  from bson.binary import STANDARD
   from bson.codec_options import CodecOptions
-  from datetime import datetime
   from pymongo import MongoClient
-  from pymongo.encryption_options import AutoEncryptionOpts
   from pymongo.encryption import ClientEncryption
-  from pymongo.errors import EncryptionError, ServerSelectionTimeoutError, ConnectionFailure
-  from urllib.parse import quote_plus
-  import names
+  from pymongo.errors import EncryptionError, ServerSelectionTimeoutError, ConnectionFailure, OperationFailure
   import sys
+  from urllib.parse import quote_plus
 except ImportError as e:
   print(f"Import error for {path.basename(__file__)}: {e}")
   exit(1)
-
-# PUT VALUES HERE!
 
 MDB_PASSWORD = "SuperP@ssword123!"
 APP_USER = "app_user"
 SDE_PASSWORD = "s3cr3t!"
 SDE_USER = "sdeadmin"
 CA_PATH = "/data/pki/ca.pem"
-
-def check_python_version() -> str | None:
-  """Checks if the current Python version is supported.
-
-  Returns:
-    A string indicating that the current Python version is not supported, or None if the current Python version is supported.
-  """
-  if version_info.major < 3 or (version_info.major == 3 and version_info.minor < 10):
-    return f"Python version {version_info.major}.{version_info.minor} is not supported, please use 3.10 or higher"
-  return None
 
 def mdb_client(connection_string: str, auto_encryption_opts: tuple[dict | None] = None) -> tuple[MongoClient | None, str | None]:
   """ Returns a MongoDB client instance
@@ -56,6 +40,7 @@ def mdb_client(connection_string: str, auto_encryption_opts: tuple[dict | None] 
     return client, None
   except (ServerSelectionTimeoutError, ConnectionFailure) as e:
     return None, f"Cannot connect to database, please check settings in config file: {e}"
+
 
 def make_dek(client: MongoClient, altName: str, provider_name: str, keyId: str) -> tuple[str | None, str | None]:
   """ Return a DEK's UUID for a give KeyAltName. Creates a new DEK if the DEK is not found.
@@ -93,18 +78,10 @@ def make_dek(client: MongoClient, altName: str, provider_name: str, keyId: str) 
   return employee_key_id, None
 
 def main():
-
-  # check version of Python is correct
-  err = check_python_version()
-  if err is not None:
-    print(err)
-    exit(1)
-
   # Obviously this should not be hardcoded
   connection_string = "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(SDE_USER),
     quote_plus(SDE_PASSWORD),
-
     quote_plus(CA_PATH)
   )
 
@@ -122,26 +99,50 @@ def main():
       "endpoint": "kmip-0:5696"
     }
   }
+  
+  # declare our database and collection
+  encrypted_db_name = "companyData"
 
-  # instantiate our MongoDB Client object
-  client, err = mdb_client(connection_string)
-  if err is not None:
-    print(err)
-    sys.exit(1)
+  try:
+    # instantiate our MongoDB Client object
+    client, err = mdb_client(connection_string)
+    if err is not None:
+      print(err)
+      sys.exit(1)
 
-  # Create role and user
-  client.admin.command("createRole", "cryptoClient",  privileges=[
-    {
-        "resource": {
-          "db": keyvault_db,
-          "collection": keyvault_coll
-        },
-        "actions": [ "find" ],
-      }
-    ],
-    roles=[]
-  )
-  client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient", {"role": "readWrite", "db": encrypted_db_name}])
+    db = client[keyvault_db]
+    coll = db[keyvault_coll]
+
+    result = coll.create_index("keyAltNames", unique=True)
+    print(result)
+
+    # Create role and user
+    client.admin.command("createRole", "cryptoClient",  privileges=[
+      {
+          "resource": {
+            "db": keyvault_db,
+            "collection": keyvault_coll
+          },
+          "actions": [ "find" ],
+        }
+      ],
+      roles=[]
+    )
+  except OperationFailure as e:
+    if e.code == 51002:
+      print("Role already exists")
+    else:
+      print(f"Error creating role: {e}")
+      sys.exit()
+
+  try:
+    client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient", {"role": "readWrite", "db": encrypted_db_name}])
+  except OperationFailure as e:
+    if e.code == 51003:
+      print("Role already exists")
+    else:
+      print(f"Error creating role: {e}")
+      sys.exit()
 
   # Instantiate our ClientEncryption object
   client_encryption = ClientEncryption(
@@ -157,71 +158,15 @@ def main():
     }
   )
 
-  data_key_id_1, err = make_dek(client_encryption, "dataKey1", provider, "1")
-  if err is not None:
-    print("Failed to find DEK")
-    sys.exit()
-
-  db = client["companyData"]
-  db.create_collection("employee", validator={
-    "$jsonSchema": {
-      "bsonType": "object",
-      "encryptMetadata": {
-        "keyId": [data_key_id_1],
-        "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
-      },
-      "properties": {
-        "name": {
-          "bsonType": "object",
-          "properties": {
-            "firstName": {
-              "encrypt" : {
-                "bsonType": "string",
-                "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
-              }
-            },
-            "lastName": {
-              "encrypt" : {
-                "bsonType": "string",
-                "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
-              }
-            },
-            "otherNames": {
-              "encrypt" : {
-                "bsonType": "string"
-              }
-            }
-          }
-        },
-        "address": {
-          "encrypt": {
-            "bsonType": "object"
-          }
-        },
-        "dob": {
-          "encrypt": {
-            "bsonType": "date"
-          }
-        },
-        "phoneNumber": {
-          "encrypt": {
-            "bsonType": "string"
-          }
-        },
-        "salary": {
-          "encrypt": {
-            "bsonType": "double"
-          }
-        },
-        "taxIdentifier": {
-          "encrypt": {
-            "bsonType": "string"
-          }
-        }
-      }
-    }
-  }
-})
+  # Retrieve the DEK UUID
+  data_key_id_1 = client_encryption.get_key_by_alt_name("dataKey1")
+  if data_key_id_1 is None:
+    data_key_id_1, err = make_dek(client_encryption, "dataKey1", provider, "1")
+    if err is not None:
+      print("Failed to find DEK")
+      sys.exit()
+  else:
+    data_key_id_1 = data_key_id_1["_id"]
 
 if __name__ == "__main__":
   main()

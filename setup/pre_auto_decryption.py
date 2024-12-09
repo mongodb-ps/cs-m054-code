@@ -104,7 +104,6 @@ def main():
   connection_string = "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(SDE_USER),
     quote_plus(SDE_PASSWORD),
-
     quote_plus(CA_PATH)
   )
 
@@ -145,7 +144,7 @@ def main():
     ],
     roles=[]
   )
-  client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient", {"role": "readWrite", "db": "companyData"}])
+  client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient", {"role": "readWrite", "db": encrypted_db_name}])
 
   firstname = names.get_first_name()
   lastname = names.get_last_name()
@@ -260,6 +259,7 @@ def main():
     "$jsonSchema": schema_map["companyData.employee"]
 })
 
+		
   auto_encryption = AutoEncryptionOpts(
     kms_provider,
     keyvault_namespace,
