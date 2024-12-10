@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"strings"
@@ -46,23 +45,45 @@ func createClient(c string, u string, p string, caFile string) (*mongo.Client, e
 	if err != nil {
 		return nil, err
 	}
+	err = client.Ping(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return client, nil
 }
 
-func createAutoEncryptionClient(c string, ns string, kms map[string]map[string]interface{}, tlsOps map[string]*tls.Config, s bson.M) (*mongo.Client, error) {
-	extraOptions := map[string]interface{}{
-		"cryptSharedLibPath":     "/data/lib/mongo_crypt_v1.so",
-		"cryptSharedLibRequired": true,
+func createAutoEncryptionClient(c string, u string, p string, caFile string, ns string, kms map[string]map[string]interface{}, tlsOps map[string]*tls.Config, s bson.M) (*mongo.Client, error) {	//auth setup
+	creds := options.Credential{
+		Username:      u,
+		Password:      p,
+		AuthMechanism: "SCRAM-SHA-256",
 	}
+
+	// TLS setup
+	caCert, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+		return nil, fmt.Errorf("failed to append CA certificate")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
 	autoEncryptionOpts := options.AutoEncryption().
 		SetKeyVaultNamespace(ns).
 		SetKmsProviders(kms).
 		SetSchemaMap(s).
-		SetTLSConfig(tlsOps).
-		SetExtraOptions(extraOptions)
+		SetTLSConfig(tlsOps)
 
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(c).SetAutoEncryptionOptions(autoEncryptionOpts))
+	client, err := mongo.Connect(
+		context.TODO(),
+		options.Client().ApplyURI(c).SetAutoEncryptionOptions(autoEncryptionOpts).SetAuth(creds).SetTLSConfig(tlsConfig),
+	)
 
 	if err != nil {
 		return nil, err
@@ -91,8 +112,8 @@ func main(){
 		caFile			 			= "/data/pki/ca.pem"
 		username 		 			= "app_user"
 		password		 			= <UPDATE_HERE>
+		encryptedClient	 	*mongo.Client
 		connectionString 	= "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
-		clientEncryption 	*mongo.ClientEncryption
 		client           	*mongo.Client
 		exitCode         	= 0
     kmipTLSConfig   	*tls.Config
@@ -209,7 +230,7 @@ func main(){
 	completeMap := map[string]interface{}{
 		db + "." + collection: testSchema,
 	}
-	encryptedClient, err = createAutoEncryptionClient(connectionString, keySpace, kmsProvider, kmsTLSOptions, completeMap)
+	encryptedClient, err = createAutoEncryptionClient(connectionString, username, password, caFile, keySpace, kmsProvider, kmsTLSOptions, completeMap)
 	if err != nil {
 		fmt.Printf("MDB encrypted client error: %s\n", err)
 		exitCode = 1

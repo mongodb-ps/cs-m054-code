@@ -46,23 +46,45 @@ func createClient(c string, u string, p string, caFile string) (*mongo.Client, e
 	if err != nil {
 		return nil, err
 	}
+	err = client.Ping(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return client, nil
 }
 
-func createAutoEncryptionClient(c string, ns string, kms map[string]map[string]interface{}, tlsOps map[string]*tls.Config, s bson.M) (*mongo.Client, error) {
-	extraOptions := map[string]interface{}{
-		"cryptSharedLibPath":     "/data/lib/mongo_crypt_v1.so",
-		"cryptSharedLibRequired": true,
+func createAutoEncryptionClient(c string, u string, p string, caFile string, ns string, kms map[string]map[string]interface{}, tlsOps map[string]*tls.Config, s bson.M) (*mongo.Client, error) { //auth setup
+	creds := options.Credential{
+		Username:      u,
+		Password:      p,
+		AuthMechanism: "SCRAM-SHA-256",
 	}
+
+	// TLS setup
+	caCert, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+		return nil, fmt.Errorf("failed to append CA certificate")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
 	autoEncryptionOpts := options.AutoEncryption().
 		SetKeyVaultNamespace(ns).
 		SetKmsProviders(kms).
 		SetSchemaMap(s).
-		SetTLSConfig(tlsOps).
-		SetExtraOptions(extraOptions)
+		SetTLSConfig(tlsOps)
 
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(c).SetAutoEncryptionOptions(autoEncryptionOpts))
+	client, err := mongo.Connect(
+		context.TODO(),
+		options.Client().ApplyURI(c).SetAutoEncryptionOptions(autoEncryptionOpts).SetAuth(creds).SetTLSConfig(tlsConfig),
+	)
 
 	if err != nil {
 		return nil, err
@@ -91,11 +113,13 @@ func main() {
 		caFile           = "/data/pki/ca.pem"
 		username         = "app_user"
 		password         = "SuperP@ssword123!"
+		encryptedClient  *mongo.Client
 		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
 		client           *mongo.Client
 		exitCode         = 0
 		kmipTLSConfig    *tls.Config
 		result           *mongo.InsertOneResult
+		findResult       bson.M
 		dekFindResult    bson.M
 		dek              primitive.Binary
 		err              error
@@ -184,54 +208,54 @@ func main() {
 		},
 		"properties": {
 			"name": {
-				 "bsonType": "object",
-				 "properties": {
-					 "firstName": {
-						 "encrypt": {
-							 "bsonType": "string",
-							 "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
-						 }
-					 },
-					 "lastName": {
-						 "encrypt": {
-							 "bsonType": "string",
-							 "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
-						 }
-					 },
-					 "otherNames": {
-						 "encrypt": {
-							 "bsonType": "string"
-						 }
-					 }
-				 }
-			 },
-			 "address": {
-				 "encrypt": {
-					 "bsonType": "object"
-				 }
-			 },
-			 "dob": {
-				 "encrypt": {
-					 "bsonType": "date"
-				 }
-			 },
-			 "phoneNumber": {
-				 "encrypt": {
-					 "bsonType": "string"
-				 }
-			 },
-			 "salary": {
-				 "encrypt": {
-					 "bsonType": "double"
-				 }
-			 },
-			 "taxIdentifier": {
-				 "encrypt": {
-					 "bsonType": "string"
-				 }
+				"bsonType": "object",
+				"properties": {
+				 	"firstName": {
+					 	"encrypt": {
+							"bsonType": "string",
+							"algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+					 	}
+				 	},
+				 	"lastName": {
+						"encrypt": {
+							"bsonType": "string",
+							"algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
+						}
+					},
+					"otherNames": {
+				 		"encrypt": {
+					 		"bsonType": "string"
+				 		}
+					}
+				}
+			},
+			"address": {
+			 "encrypt": {
+				 "bsonType": "object"
 			 }
-		 }
-		}`
+			},
+			"dob": {
+			 "encrypt": {
+				 "bsonType": "date"
+			 }
+			},
+			"phoneNumber": {
+			 "encrypt": {
+				 "bsonType": "string"
+			 }
+			},
+			"salary": {
+			 "encrypt": {
+				 "bsonType": "double"
+			 }
+			},
+			"taxIdentifier": {
+			 "encrypt": {
+				 "bsonType": "string"
+			 }
+			}
+		}
+	}`
 
 	// Auto Encryption Client
 	var testSchema bson.Raw
@@ -242,7 +266,7 @@ func main() {
 	completeMap := map[string]interface{}{
 		db + "." + collection: testSchema,
 	}
-	encryptedClient, err = createAutoEncryptionClient(connectionString, keySpace, kmsProvider, kmsTLSOptions, completeMap)
+	encryptedClient, err = createAutoEncryptionClient(connectionString, username, password, caFile, keySpace, kmsProvider, kmsTLSOptions, completeMap)
 	if err != nil {
 		fmt.Printf("MDB encrypted client error: %s\n", err)
 		exitCode = 1
@@ -264,12 +288,23 @@ func main() {
 		exitCode = 1
 		return
 	}
-	fmt.Print(result.InsertedID)
+	fmt.Println(result.InsertedID)
 
-	err = encryptedColl.FindOne(context.TODO(), bson.M{"salary": 999999.99}).Decode(&findResult)
+	err = encryptedColl.FindOne(context.TODO(), bson.M{"_id": result.InsertedID}).Decode(&findResult)
+	if err != nil {
+		fmt.Printf("MongoDB find error: %s\n", err)
+		exitCode = 1
+		return
+	}
+	if len(findResult) == 0 {
+		fmt.Println("Cannot find document")
+		exitCode = 1
+		return
+	}
+	fmt.Printf("%+v\n", findResult)
 
 	// As per the excercise attempt to query salary field
-	//err = encryptedColl.FindOne(context.TODO(), bson.M{"name.firstName": firstname}).Decode(&findResult) // Uncomment this to attemt to query name.firstName
+	err = encryptedColl.FindOne(context.TODO(), bson.M{"salary": 999999.99}).Decode(&findResult)
 	if err != nil {
 		fmt.Printf("MongoDB find error: %s\n", err)
 		exitCode = 1
