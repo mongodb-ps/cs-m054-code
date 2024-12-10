@@ -101,7 +101,6 @@ def main():
   connection_string = "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(APP_USER),
     quote_plus(MDB_PASSWORD),
-
     quote_plus(CA_PATH)
   )
 
@@ -157,7 +156,7 @@ def main():
   # retrieve the DEK UUID
   _, err = get_employee_key(client_encryption, employee_id, provider, '1')
   if err is not None:
-    print("User DEK missing")
+    print(f"User DEK missing: {err}")
     sys.exit(1)
 
   payload = {
