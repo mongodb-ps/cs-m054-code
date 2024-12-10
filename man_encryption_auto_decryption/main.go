@@ -86,8 +86,7 @@ func main() {
 		keyVaultDB 			 = "__encryption"
 		keyVaultColl 		 = "__keyVault"
 		keySpace         = keyVaultDB + "." + keyVaultColl
-		connectionString = "mongodb://app_user:" + MDB_PASSWORD + "@" + STUDENTNAME + "02.dbservers.mdbps.internal/?replicaSet=rs0&tls=true&tlsCAFile=%2Fhome%2Fubuntu%2Fca.cert"
-		kmipEndpoint     = STUDENTNAME + "01.kmipservers.mdbps.internal"
+		connectionString = "mongodb://app_user:" + MDB_PASSWORD + "@mongodb-0:27017/?replicaSet=rs0&tls=true&tlsCAFile=%2Fdata%2Fpki%2Fca.pem"
 		clientEncryption *mongo.ClientEncryption
 		encryptedClient  *mongo.Client
 		client           *mongo.Client
@@ -266,7 +265,7 @@ func main() {
 	}
 
 	// WRITE YOUR QUERY HERE FOR AUTODECRYPTION. REMEMBER WHICH CLIENT TO USE!
-	err = 
+	err = <UPDATE_HERE> 
 	if err != nil {
 		fmt.Printf("MongoDB find error: %s\n", err)
 		exitCode = 1

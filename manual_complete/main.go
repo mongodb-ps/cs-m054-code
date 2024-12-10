@@ -4,6 +4,7 @@ import (
 	"C"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"os"
 	"time"
@@ -14,15 +15,31 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var (
-	
-	MDB_PASSWORD =
-)
+func createClient(c string, u string, p string, caFile string) (*mongo.Client, error) {
+	//auth setup
+	creds := options.Credential{
+		Username:      u,
+		Password:      p,
+		AuthMechanism: "SCRAM-SHA-256",
+	}
 
-// Function to create MognoDB client instance
-func createClient(c string) (*mongo.Client, error) {
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(c))
+	// TLS setup
+	caCert, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+		return nil, fmt.Errorf("failed to append CA certificate")
+	}
 
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	// instantiate client
+	opts := options.Client().ApplyURI(c).SetAuth(creds).SetTLSConfig(tlsConfig)
+	client, err := mongo.Connect(context.TODO(), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +80,7 @@ func encryptManual(ce *mongo.ClientEncryption, dek primitive.Binary, alg string,
 	return out, nil
 }
 
-func decryptManual(c *mongo.ClientEncryption, d primitive.Binary)(bson.RawValue, error) {
+func decryptManual(c *mongo.ClientEncryption, d primitive.Binary) (bson.RawValue, error) {
 	out, err := c.Decrypt(context.TODO(), d)
 	if err != nil {
 		return bson.RawValue{}, err
@@ -105,22 +122,24 @@ func traverseBson(c *mongo.ClientEncryption, d bson.M) (bson.M, error) {
 
 func main() {
 	var (
-		keyVaultDB 			 = "__encryption"
-		keyVaultColl 		 = "__keyVault"
+		keyVaultDB       = "__encryption"
+		keyVaultColl     = "__keyVault"
 		keySpace         = keyVaultDB + "." + keyVaultColl
-		connectionString = "mongodb://app_user:" + MDB_PASSWORD + "@" + STUDENTNAME + "02.dbservers.mdbps.internal/?replicaSet=rs0&tls=true&tlsCAFile=%2Fhome%2Fubuntu%2Fca.cert"
-		kmipEndpoint     = STUDENTNAME + "01.kmipservers.mdbps.internal"
+		caFile           = "/data/pki/ca.pem"
+		username         = "app_user"
+		password         = "SuperP@ssword123!"
+		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
 		clientEncryption *mongo.ClientEncryption
 		client           *mongo.Client
 		exitCode         = 0
+		kmipTLSConfig    *tls.Config
 		result           *mongo.InsertOneResult
 		dekFindResult    bson.M
-		findResult			 bson.M
-		outputData			 bson.M
 		dek              primitive.Binary
-		encryptedName 	 primitive.Binary
-		kmipTLSConfig    *tls.Config
-		err							 error
+		encryptedName    primitive.Binary
+		findResult       bson.M
+		outputData       bson.M
+		err              error
 	)
 
 	defer func() {
@@ -130,11 +149,11 @@ func main() {
 	provider := "kmip"
 	kmsProvider := map[string]map[string]interface{}{
 		provider: {
-			"endpoint": <UPDATE_HERE>
+			"endpoint": "kmip-0:5696",
 		},
 	}
 
-	client, err = createClient(connectionString)
+	client, err = createClient(connectionString, username, password, caFile)
 	if err != nil {
 		fmt.Printf("MDB client error: %s\n", err)
 		exitCode = 1
@@ -146,7 +165,7 @@ func main() {
 	// Set the KMIP TLS options
 	kmsTLSOptions := make(map[string]*tls.Config)
 	tlsOptions := map[string]interface{}{
-		"tlsCAFile": "/data/pki/ca.pem",
+		"tlsCAFile":             "/data/pki/ca.pem",
 		"tlsCertificateKeyFile": "/data/pki/client-0.pem",
 	}
 	kmipTLSConfig, err = options.BuildTLSConfig(tlsOptions)
@@ -156,7 +175,6 @@ func main() {
 		return
 	}
 	kmsTLSOptions["kmip"] = kmipTLSConfig
-	
 
 	clientEncryption, err = createManualEncryptionClient(client, kmsProvider, keySpace, kmsTLSOptions)
 	if err != nil {
@@ -165,25 +183,25 @@ func main() {
 		return
 	}
 
-  payload := bson.M{
-    "name": bson.M{
-      "firstName": "Kuber",
-      "lastName": "Engineer",
-      "otherNames": nil,
-    },
-    "address": bson.M{
-      "streetAddress": "12 Bson Street",
-      "suburbCounty": "Mongoville",
-      "stateProvince": "Victoria",
-      "zipPostcode": "3999",
-      "country": "Oz",
-    },
-    "dob": time.Date(1981, 11, 11, 0, 0, 0, 0, time.Local),
-    "phoneNumber": "1800MONGO",
-    "salary": 999999.99,
-    "taxIdentifier": "78SDSSNN001",
-    "role": []string{"DEV"},
-  }
+	payload := bson.M{
+		"name": bson.M{
+			"firstName":  "Kuber",
+			"lastName":   "Engineer",
+			"otherNames": nil,
+		},
+		"address": bson.M{
+			"streetAddress": "12 Bson Street",
+			"suburbCounty":  "Mongoville",
+			"stateProvince": "Victoria",
+			"zipPostcode":   "3999",
+			"country":       "Oz",
+		},
+		"dob":           time.Date(1981, 11, 11, 0, 0, 0, 0, time.Local),
+		"phoneNumber":   "1800MONGO",
+		"salary":        999999.99,
+		"taxIdentifier": "78SDSSNN001",
+		"role":          []string{"DEV"},
+	}
 
 	// Retrieve our DEK
 	opts := options.FindOne().SetProjection(bson.D{{Key: "_id", Value: 1}})

@@ -4,6 +4,7 @@ import (
 	"C"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"os"
 	"time"
@@ -71,7 +72,7 @@ func encryptManual(ce *mongo.ClientEncryption, dek primitive.Binary, alg string,
 		SetAlgorithm(alg).
 		SetKeyID(dek)
 
-	out, err = // PUT CODE HERE TO MANUALLY ENCRYPT
+	out, err = <UPDATE_HERE> // PUT CODE HERE TO MANUALLY ENCRYPT
 	if err != nil {
 		return primitive.Binary{}, err
 	}
@@ -108,7 +109,7 @@ func main() {
 			"endpoint": <UPDATE_HERE>
 		},
 	}
-	client, err = createClient(connectionString)
+	client, err = createClient(connectionString, username, password, caFile)
 	if err != nil {
 		fmt.Printf("MDB client error: %s\n", err)
 		exitCode = 1
@@ -160,7 +161,7 @@ func main() {
 
 	// Retrieve our DEK
 	opts := options.FindOne().SetProjection(bson.D{{Key: "_id", Value: 1}})
-	err = coll.FindOne(context.TODO(), bson.D{// Put your DEK query here}, opts).Decode(&dekFindResult)
+	err = coll.FindOne(context.TODO(), bson.D{<UPDATE_HERE> // query for DEK}, opts).Decode(&dekFindResult)
 	if err != nil || len(dekFindResult) == 0 {
 		fmt.Printf("DEK find error: %s\n", err)
 		exitCode = 1
@@ -175,7 +176,7 @@ func main() {
 	if name["otherNames"] == nil {
 		// put code here to remove this field if nil
 	} else {
-		name["otherNames"], err = encryptManual(// put required variables here)
+		name["otherNames"], err = encryptManual(<UPDATE_HERE>// put required variables here)
 		if err != nil {
 			fmt.Printf("ClientEncrypt error: %s\n", err)
 			exitCode = 1
@@ -183,14 +184,14 @@ func main() {
 		}
 	}
 
-	name["firstName"], err = encryptManual(// put required variables here)
+	name["firstName"], err = encryptManual(<UPDATE_HERE>// put required variables here)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
 		return
 	}
 
-	name["lastName"], err = encryptManual(// put required variables here)
+	name["lastName"], err = encryptManual(<UPDATE_HERE>// put required variables here)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
@@ -198,35 +199,35 @@ func main() {
 	}
 	payload["name"] = name
 
-	payload["address"], err = encryptManual(// put required variables here)
+	payload["address"], err = encryptManual(<UPDATE_HERE>// put required variables here)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
 		return
 	}
 
-	payload["dob"], err = encryptManual(// put required variables here)
+	payload["dob"], err = encryptManual(<UPDATE_HERE>// put required variables here)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
 		return
 	}
 
-	payload["phoneNumber"], err = encryptManual(// put required variables here)
+	payload["phoneNumber"], err = encryptManual(<UPDATE_HERE>// put required variables here)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
 		return
 	}
 
-	payload["salary"], err = encryptManual(// put required variables here)
+	payload["salary"], err = encryptManual(<UPDATE_HERE>// put required variables here)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
 		return
 	}
 
-	payload["taxIdentifier"], err = encryptManual(// put required variables here)
+	payload["taxIdentifier"], err = encryptManual(<UPDATE_HERE>// put required variables here)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
