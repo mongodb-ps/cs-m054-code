@@ -105,7 +105,7 @@ def main():
     kms_tls_options = {
       "kmip": {
         "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/root/server.pem"
+        "tlsCertificateKeyFile": "/data/pki/ca.pem"
       }
     }
   )
