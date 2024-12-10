@@ -332,7 +332,7 @@ func main() {
 		fmt.Printf("Unmarshal Error: %s\n", err)
 	}
 	completeMap := map[string]interface{}{
-		"employData.employee": testSchema,
+		db + "." + collection: testSchema,
 	}
 	encryptedClient, err = createAutoEncryptionClient(connectionString, username, password, caFile, keySpace, kmsProvider, kmsTLSOptions, completeMap)
 	if err != nil {
@@ -350,7 +350,7 @@ func main() {
 		delete(name, "otherNames")
 	}
 	// manually encrypt our firstName and lastName values:
-	name["firstName"], err = encryptManual(clientEncryption, employeeDEK, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["firstName"])
+	encryptedFirstName, err := encryptManual(clientEncryption, employeeDEK, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["firstName"])
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
@@ -373,7 +373,7 @@ func main() {
 	}
 	fmt.Println(result.InsertedID)
 
-	err = encryptedColl.FindOne(context.TODO(), bson.M{"name.firstName": name["firstName"]}).Decode(&findResult)
+	err = encryptedColl.FindOne(context.TODO(), bson.M{"name.firstName": encryptedFirstName}).Decode(&findResult)
 	if err != nil {
 		fmt.Printf("MongoDB find error: %s\n", err)
 		exitCode = 1
