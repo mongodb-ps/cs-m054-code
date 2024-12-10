@@ -120,6 +120,7 @@ func main() {
     kmipTLSConfig   	*tls.Config
 		result           	*mongo.InsertOneResult
 		dekFindResult    	bson.M
+		findResult       bson.M
 		dek              	primitive.Binary
 		err				 				error
 	)
