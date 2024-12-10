@@ -144,19 +144,19 @@ def main():
     # Don't forget to handle to event of name.otherNames being null
 
     # Do deterministic fields
-    payload["name"]["firstName"] = # Put code here to encrypt the data
-    payload["name"]["lastName"] = # Put code here to encrypt the data
+    payload["name"]["firstName"] = <UPDATE_HERE> # Put code here to encrypt the data
+    payload["name"]["lastName"] = <UPDATE_HERE> # Put code here to encrypt the data
 
     # Do random fields
     if payload["name"]["otherNames"] is None:
-      # put code here to delete this field if None
+      <UPDATE_HERE> # put code here to delete this field if None
     else:
-      payload["name"]["otherNames"] = # Put code here to encrypt the data
-    payload["address"] = # Put code here to encrypt the data
-    payload["dob"] = # Put code here to encrypt the data
-    payload["phoneNumber"] = # Put code here to encrypt the data
-    payload["salary"] = # Put code here to encrypt the data
-    payload["taxIdentifier"] = # Put code here to encrypt the data
+      payload["name"]["otherNames"] = <UPDATE_HERE> # Put code here to encrypt the data
+    payload["address"] = <UPDATE_HERE> # Put code here to encrypt the data
+    payload["dob"] = <UPDATE_HERE> # Put code here to encrypt the data
+    payload["phoneNumber"] = <UPDATE_HERE> # Put code here to encrypt the data
+    payload["salary"] = <UPDATE_HERE> # Put code here to encrypt the data
+    payload["taxIdentifier"] = <UPDATE_HERE> # Put code here to encrypt the data
 
 
     # Test if the data is encrypted

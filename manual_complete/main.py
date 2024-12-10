@@ -17,8 +17,7 @@ except ImportError as e:
 
 
 # PUT VALUES HERE!
-
-MDB_PASSWORD = <UPDATE_HERE> 
+MDB_PASSWORD = "SuperP@ssword123!"
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 
@@ -136,7 +135,7 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": <UPDATE_HERE>
+      "endpoint": "kmip-0:5696"
     }
   }
   
@@ -212,7 +211,7 @@ def main():
 
     # Test if the data is encrypted
     for data in [ payload["name"]["firstName"], payload["name"]["lastName"], payload["address"], payload["dob"], payload["phoneNumber"], payload["salary"], payload["taxIdentifier"]]:
-      if type(data) is not Binary or data.subtype != 6:
+      if type(data) is not Binary or (type(data) is Binary and data.subtype != 6):
         print("Data is not encrypted")
         sys.exit()
 

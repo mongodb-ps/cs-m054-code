@@ -78,7 +78,7 @@ def decrypt_data(client_encryption: ClientEncryption, data: dict) -> dict | str:
     if type(data) == Binary and data.subtype == 6:
 
       # PUT YOUR DECRYPTION CODE HERE
-      decrypted_data = <PUT CODE HERE> 
+      decrypted_data = <UPDATE_HERE>  
 
       return decrypted_data
     else:
@@ -234,7 +234,7 @@ def main():
   try:
 
     # WRITE CODE TO ENCRYPT THE NAME WE ARE GOING TO QUERY FOR
-    encrypted_name = 
+    encrypted_name = <UPDATE_HERE>  
     encrypted_doc = client[encrypted_db_name][encrypted_coll_name].find_one({"name.firstName": encrypted_name})
     print(encrypted_doc)
 
