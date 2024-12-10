@@ -95,6 +95,16 @@ func createAutoEncryptionClient(c string, u string, p string, caFile string, ns 
 	return client, nil
 }
 
+func createManualEncryptionClient(c *mongo.Client, kp map[string]map[string]interface{}, kns string, tlsOps map[string]*tls.Config) (*mongo.ClientEncryption, error) {
+	o := options.ClientEncryption().SetKeyVaultNamespace(kns).SetKmsProviders(kp).SetTLSConfig(tlsOps)
+	client, err := mongo.NewClientEncryption(c, o)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
 func encryptManual(ce *mongo.ClientEncryption, dek primitive.Binary, alg string, data interface{}) (primitive.Binary, error) {
 	var out primitive.Binary
 	rawValueType, rawValueData, err := bson.MarshalValue(data)

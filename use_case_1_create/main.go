@@ -283,7 +283,7 @@ func main() {
 	schemaMap := `{
 		"bsonType": "object",
 		"encryptMetadata": {
-			"keyId": ,// put your JOSN pointer here,
+			"keyId": <UPDATE_HERE>,// put your JOSN pointer here,
 			"algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
 		},
 		"properties": {
