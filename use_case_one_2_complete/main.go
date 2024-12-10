@@ -142,23 +142,6 @@ func getDEK(c *mongo.ClientEncryption, altName string) (primitive.Binary, error)
 	return b, nil
 }
 
-func trashDEK(c *mongo.ClientEncryption, kp map[string]map[string]interface{}, kns string, keyID primitive.Binary) error {
-	var (
-		delResult *mongo.DeleteResult
-		err       error
-	)
-
-	delResult, err = c.DeleteKey(context.TODO(), keyID)
-	if err != nil {
-		return err
-	}
-	if delResult.DeletedCount == 0 {
-		return errors.New("no DEK deleted")
-	}
-
-	return nil
-}
-
 func nameGenerator() (string, string) {
 	seed := time.Now().UTC().UnixNano()
 	nameGenerator := namegenerator.NewNameGenerator(seed)
@@ -181,7 +164,6 @@ func main() {
 		clientEncryption *mongo.ClientEncryption
 		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
 		dek              primitive.Binary
-		employeeDEK      primitive.Binary
 		err              error
 		exitCode         = 0
 		findResult       bson.M
@@ -239,10 +221,10 @@ func main() {
 	id := strconv.Itoa(int(rand.Intn(100000)))
 
 	// get our employee DEK or create
-	employeeDEK, err = getDEK(clientEncryption, id)
+	_, err = getDEK(clientEncryption, id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			employeeDEK, err = createDEK(clientEncryption, provider, cmk, id)
+			_, err = createDEK(clientEncryption, provider, cmk, id)
 			if err != nil {
 				fmt.Printf("Cannot create employee DEK: %s\n", err)
 				exitCode = 1
@@ -406,24 +388,6 @@ func main() {
 		return
 	}
 	fmt.Printf("%+v\n", findResult)
-
-	err = trashDEK(clientEncryption, kmsProvider, keySpace, employeeDEK)
-	if err != nil {
-		fmt.Printf("DEK deletion error: %s", err)
-	}
-	time.Sleep(61 * time.Second)
-
-	err = encryptedColl.FindOne(context.TODO(), bson.M{"name.firstName": firstname}).Decode(&findResult)
-	if err != nil {
-		fmt.Printf("MongoDB find error: %s\n", err)
-		exitCode = 1
-		return
-	}
-	if len(findResult) == 0 {
-		fmt.Println("Cannot find document")
-		exitCode = 1
-		return
-	}
 	fmt.Printf("%+v\n", findResult)
 
 	exitCode = 0

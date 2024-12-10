@@ -285,20 +285,6 @@ def main():
     print(f"Encryption error: {e}")
     sys.exit(1)
 
-  client[keyvault_db][keyvault_coll].delete_one({"keyAltNames": employee_id})
-  result = encrypted_db[encrypted_coll_name].find_one({"name.firstName": firstname, "name.lastName": lastname})
-  pprint(result)
-
-  sleep(60)
-
-  try: 
-    result = encrypted_db[encrypted_coll_name].find_one({"name.firstName": firstname, "name.lastName": lastname})
-    
-    pprint(result)
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
-    sys.exit(1)
-
 
 
 if __name__ == "__main__":
