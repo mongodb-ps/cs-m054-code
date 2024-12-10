@@ -4,7 +4,7 @@ import (
 	"C"
 	"context"
 	"crypto/tls"
-	"encoding/base64"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -13,20 +13,80 @@ import (
 	"strings"
 	"time"
 
+	"github.com/goombaio/namegenerator"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"github.com/goombaio/namegenerator"
 )
 
-var (
-	
-	MDB_PASSWORD =
-)
+func createClient(c string, u string, p string, caFile string) (*mongo.Client, error) {
+	//auth setup
+	creds := options.Credential{
+		Username:      u,
+		Password:      p,
+		AuthMechanism: "SCRAM-SHA-256",
+	}
 
-func createClient(c string) (*mongo.Client, error) {
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(c))
+	// TLS setup
+	caCert, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+		return nil, fmt.Errorf("failed to append CA certificate")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	// instantiate client
+	opts := options.Client().ApplyURI(c).SetAuth(creds).SetTLSConfig(tlsConfig)
+	client, err := mongo.Connect(context.TODO(), opts)
+	if err != nil {
+		return nil, err
+	}
+	err = client.Ping(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func createAutoEncryptionClient(c string, u string, p string, caFile string, ns string, kms map[string]map[string]interface{}, tlsOps map[string]*tls.Config, s bson.M) (*mongo.Client, error) { //auth setup
+	creds := options.Credential{
+		Username:      u,
+		Password:      p,
+		AuthMechanism: "SCRAM-SHA-256",
+	}
+
+	// TLS setup
+	caCert, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+		return nil, fmt.Errorf("failed to append CA certificate")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	autoEncryptionOpts := options.AutoEncryption().
+		SetKeyVaultNamespace(ns).
+		SetKmsProviders(kms).
+		SetSchemaMap(s).
+		SetTLSConfig(tlsOps)
+
+	client, err := mongo.Connect(
+		context.TODO(),
+		options.Client().ApplyURI(c).SetAutoEncryptionOptions(autoEncryptionOpts).SetAuth(creds).SetTLSConfig(tlsConfig),
+	)
 
 	if err != nil {
 		return nil, err
@@ -38,27 +98,6 @@ func createClient(c string) (*mongo.Client, error) {
 func createManualEncryptionClient(c *mongo.Client, kp map[string]map[string]interface{}, kns string, tlsOps map[string]*tls.Config) (*mongo.ClientEncryption, error) {
 	o := options.ClientEncryption().SetKeyVaultNamespace(kns).SetKmsProviders(kp).SetTLSConfig(tlsOps)
 	client, err := mongo.NewClientEncryption(c, o)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-func createAutoEncryptionClient(c string, ns string, kms map[string]map[string]interface{}, tlsOps map[string]*tls.Config, s bson.M) (*mongo.Client, error) {
-	extraOptions := map[string]interface{}{
-		"cryptSharedLibPath":     "/data/lib/mongo_crypt_v1.so",
-		"cryptSharedLibRequired": true,
-	}
-	autoEncryptionOpts := options.AutoEncryption().
-		SetKeyVaultNamespace(ns).
-		SetKmsProviders(kms).
-		SetSchemaMap(s).
-		SetTLSConfig(tlsOps).
-		SetExtraOptions(extraOptions)
-
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(c).SetAutoEncryptionOptions(autoEncryptionOpts))
-
 	if err != nil {
 		return nil, err
 	}
@@ -114,9 +153,12 @@ func nameGenerator()(string, string) {
 
 func main() {
 	var (
-		client           *mongo.Client
+		caFile           = "/data/pki/ca.pem"
+		username         = "app_user"
+		password         = <UPDATE_HERE>
+		encryptedClient  *mongo.Client
 		clientEncryption *mongo.ClientEncryption
-		connectionString = "mongodb://app_user:" + MDB_PASSWORD + "@" + STUDENTNAME + "02.dbservers.mdbps.internal/?replicaSet=rs0&tls=true&tlsCAFile=%2Fhome%2Fubuntu%2Fca.cert"
+		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
 		dek              primitive.Binary
 		employeeDEK      primitive.Binary
 		encryptedClient  *mongo.Client
@@ -125,7 +167,7 @@ func main() {
 		findResult			 bson.M
 		keyVaultColl 		 = "__keyVault"
 		keyVaultDB 			 = "__encryption"
-		kmipEndpoint     = STUDENTNAME + "01.kmipservers.mdbps.internal"
+		
 		kmipTLSConfig    *tls.Config
 		result           *mongo.InsertOneResult
 		delResult 			 *mongo.DeleteResult
@@ -146,7 +188,7 @@ func main() {
 	}
 	keySpace := keyVaultDB + "." + keyVaultColl
 
-	client, err = createClient(connectionString)
+	client, err = createClient(connectionString, username, password, caFile)
 	if err != nil {
 		fmt.Printf("MDB client error: %s\n", err)
 		exitCode = 1
@@ -167,7 +209,7 @@ func main() {
 	}
 	kmsTLSOptions["kmip"] = kmipTLSConfig
 	
-	clientEncryption, err = createManualEncryptionClient(client, kmsProvider, keySpace, kmsTLSOptions)
+	clientEncryption, err = createManualEncryptionClient(client, username, password, caFile, kmsProvider, keySpace, kmsTLSOptions)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
