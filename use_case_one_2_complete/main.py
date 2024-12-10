@@ -116,7 +116,7 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": <UPDATE_HERE>
+      "endpoint": "kmip-0:5696" 
     }
   }
   
