@@ -14,20 +14,38 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var (
-	
-	MDB_PASSWORD =
-)
+func createClient(c string, u string, p string, caFile string) (*mongo.Client, error) {
+	//auth setup
+	creds := options.Credential{
+		Username:      u,
+		Password:      p,
+		AuthMechanism: "SCRAM-SHA-256",
+	}
 
-func createClient(c string) (*mongo.Client, error) {
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(c))
+	// TLS setup
+	caCert, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+		return nil, fmt.Errorf("failed to append CA certificate")
+	}
 
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	// instantiate client
+	opts := options.Client().ApplyURI(c).SetAuth(creds).SetTLSConfig(tlsConfig)
+	client, err := mongo.Connect(context.TODO(), opts)
 	if err != nil {
 		return nil, err
 	}
 
 	return client, nil
 }
+
 
 func createManualEncryptionClient(c *mongo.Client, kp map[string]map[string]interface{}, kns string, tlsOps map[string]*tls.Config) (*mongo.ClientEncryption, error) {
 	o := options.ClientEncryption().SetKeyVaultNamespace(kns).SetKmsProviders(kp).SetTLSConfig(tlsOps)
@@ -86,7 +104,10 @@ func main() {
 		keyVaultDB 			 = "__encryption"
 		keyVaultColl 		 = "__keyVault"
 		keySpace         = keyVaultDB + "." + keyVaultColl
-		connectionString = "mongodb://app_user:" + MDB_PASSWORD + "@mongodb-0:27017/?replicaSet=rs0&tls=true&tlsCAFile=%2Fdata%2Fpki%2Fca.pem"
+		caFile			 			= "/data/pki/ca.pem"
+		username 		 			= "app_user"
+		password		 			= <UPDATE_HERE>
+		connectionString 	= "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
 		clientEncryption *mongo.ClientEncryption
 		encryptedClient  *mongo.Client
 		client           *mongo.Client
@@ -111,7 +132,7 @@ func main() {
 		},
 	}
 
-	client, err = createClient(connectionString)
+	client, err = createClient(connectionString, username, password, caFile)
 	if err != nil {
 		fmt.Printf("MDB client error: %s\n", err)
 		exitCode = 1

@@ -108,7 +108,7 @@ def main():
       "bsonType": "object",
       "encryptMetadata": {
         "keyId": [data_key_id_1],
-        "algorithm": # PUT APPROPRIATE ALGORITHHM HERE
+        "algorithm": <UPDATE_HERE># PUT APPROPRIATE ALGORITHHM HERE
       },
       "properties": {
         "name": {
@@ -120,9 +120,11 @@ def main():
                 "algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
               },
             },
+            <UPDATE_HERE>
             # PUT MORE FIELDS IN HERE
           }
         }
+        <UPDATE_HERE>
         # COMPLETE THE REST OF THE SCHEMA MAP
       }
     }
