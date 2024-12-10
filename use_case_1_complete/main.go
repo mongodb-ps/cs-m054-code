@@ -166,20 +166,20 @@ func main() {
 	var (
 		caFile           = "/data/pki/ca.pem"
 		username         = "app_user"
-		password         = <UPDATE_HERE>
+		password         = "SuperP@ssword123!"
+		client           *mongo.Client
 		encryptedClient  *mongo.Client
 		clientEncryption *mongo.ClientEncryption
 		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
 		employeeDEK      primitive.Binary
-		encryptedClient  *mongo.Client
 		err              error
 		exitCode         = 0
 		findResult       bson.M
 		keyVaultColl     = "__keyVault"
 		keyVaultDB       = "__encryption"
-		
-		kmipTLSConfig    *tls.Config
-		result           *mongo.InsertOneResult
+
+		kmipTLSConfig *tls.Config
+		result        *mongo.InsertOneResult
 	)
 
 	defer func() {
@@ -189,7 +189,7 @@ func main() {
 	provider := "kmip"
 	kmsProvider := map[string]map[string]interface{}{
 		provider: {
-			"endpoint": <UPDATE_HERE>,
+			"endpoint": "kmip-0:5696",
 		},
 	}
 	cmk := map[string]interface{}{

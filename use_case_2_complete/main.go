@@ -17,6 +17,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+import (
+	"errors"
+	"math/rand"
+	"strconv"
+)
 
 func createClient(c string, u string, p string, caFile string) (*mongo.Client, error) {
 	//auth setup
@@ -154,7 +159,7 @@ func trashDEK(c *mongo.ClientEncryption, kp map[string]map[string]interface{}, k
 	return nil
 }
 
-func nameGenerator()(string, string) {
+func nameGenerator() (string, string) {
 	seed := time.Now().UTC().UnixNano()
 	nameGenerator := namegenerator.NewNameGenerator(seed)
 
@@ -170,21 +175,21 @@ func main() {
 	var (
 		caFile           = "/data/pki/ca.pem"
 		username         = "app_user"
-		password         = <UPDATE_HERE>
+		password         = "SuperP@ssword123!"
+		client           *mongo.Client
 		encryptedClient  *mongo.Client
 		clientEncryption *mongo.ClientEncryption
 		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
 		dek              primitive.Binary
 		employeeDEK      primitive.Binary
-		encryptedClient  *mongo.Client
-		err							 error
+		err              error
 		exitCode         = 0
-		findResult			 bson.M
-		keyVaultColl 		 = "__keyVault"
-		keyVaultDB 			 = "__encryption"
-		
-		kmipTLSConfig    *tls.Config
-		result           *mongo.InsertOneResult
+		findResult       bson.M
+		keyVaultColl     = "__keyVault"
+		keyVaultDB       = "__encryption"
+
+		kmipTLSConfig *tls.Config
+		result        *mongo.InsertOneResult
 	)
 
 	defer func() {
@@ -194,7 +199,7 @@ func main() {
 	provider := "kmip"
 	kmsProvider := map[string]map[string]interface{}{
 		provider: {
-			"endpoint": <UPDATE_HERE>,
+			"endpoint": "kmip-0:5696",
 		},
 	}
 	cmk := map[string]interface{}{
@@ -212,7 +217,7 @@ func main() {
 	// Set the KMIP TLS options
 	kmsTLSOptions := make(map[string]*tls.Config)
 	tlsOptions := map[string]interface{}{
-		"tlsCAFile": "/data/pki/ca.pem",
+		"tlsCAFile":             "/data/pki/ca.pem",
 		"tlsCertificateKeyFile": "/data/pki/client-0.pem",
 	}
 	kmipTLSConfig, err = options.BuildTLSConfig(tlsOptions)
@@ -222,7 +227,7 @@ func main() {
 		return
 	}
 	kmsTLSOptions["kmip"] = kmipTLSConfig
-	
+
 	clientEncryption, err = createManualEncryptionClient(client, kmsProvider, keySpace, kmsTLSOptions)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
@@ -249,28 +254,28 @@ func main() {
 			return
 		}
 	}
-	
+
 	firstname, lastname := nameGenerator()
-  payload := bson.M{
+	payload := bson.M{
 		"_id": id,
-    "name": bson.M{
-      "firstName": firstname,
-      "lastName": lastname,
-      "otherNames": nil,
-    },
-    "address": bson.M{
-      "streetAddress": "29 Bson Street",
-      "suburbCounty": "Mongoville",
-      "stateProvince": "Victoria",
-      "zipPostcode": "3999",
-      "country": "Oz",
-    },
-    "dob": time.Date(1999, 1, 12, 0, 0, 0, 0, time.Local),
-    "phoneNumber": "1800MONGO",
-    "salary": 999999.99,
-    "taxIdentifier": "78SDSSWN001",
-    "role": []string{"Student"},
-  }
+		"name": bson.M{
+			"firstName":  firstname,
+			"lastName":   lastname,
+			"otherNames": nil,
+		},
+		"address": bson.M{
+			"streetAddress": "29 Bson Street",
+			"suburbCounty":  "Mongoville",
+			"stateProvince": "Victoria",
+			"zipPostcode":   "3999",
+			"country":       "Oz",
+		},
+		"dob":           time.Date(1999, 1, 12, 0, 0, 0, 0, time.Local),
+		"phoneNumber":   "1800MONGO",
+		"salary":        999999.99,
+		"taxIdentifier": "78SDSSWN001",
+		"role":          []string{"Student"},
+	}
 
 	// Retrieve our DEK
 	dek, err = getDEK(clientEncryption, "dataKey1")
@@ -282,7 +287,7 @@ func main() {
 
 	db := "companyData"
 	collection := "employee"
-	
+
 	schemaMap := `{
 		"bsonType": "object",
 		"encryptMetadata": {

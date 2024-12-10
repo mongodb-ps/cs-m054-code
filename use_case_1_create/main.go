@@ -175,6 +175,7 @@ func main() {
 		caFile           = "/data/pki/ca.pem"
 		username         = "app_user"
 		password         = <UPDATE_HERE>
+		client           *mongo.Client
 		encryptedClient  *mongo.Client
 		clientEncryption *mongo.ClientEncryption
 		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
