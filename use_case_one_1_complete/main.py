@@ -13,7 +13,7 @@ import sys
 
 # PUT VALUES HERE!
 
-MDB_PASSWORD = <UPDATE_HERE> 
+MDB_PASSWORD = "SuperP@ssword123!"
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 
@@ -69,7 +69,7 @@ def get_employee_key(client, altName, provider_name, keyId):
   if employee_key_id == None:
     try:
       #PUT CODE HERE TO CREATE THE NEW DEK
-      master_key = {"keyId": keyId, "endpoint": <UPDATE_HERE>
+      master_key = {"keyId": keyId, "endpoint": "kmip-0:5696"}
       employee_key_id = client.create_data_key(kms_provider=provider_name, master_key=master_key, key_alt_names=[str(altName)])
     except EncryptionError as e:
       return None, f"ClientEncryption error: {e}"
@@ -98,7 +98,7 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": <UPDATE_HERE>
+      "endpoint": "kmip-0:5696"
     }
   }
   
