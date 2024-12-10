@@ -122,6 +122,9 @@ def main():
       "endpoint": "kmip-0:5696"
     }
   }
+  
+  # declare our database and collection
+  encrypted_db_name = "companyData"
 
   # instantiate our MongoDB Client object
   client, err = mdb_client(connection_string)
