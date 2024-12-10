@@ -136,8 +136,11 @@ func main() {
 		exitCode         	= 0
     kmipTLSConfig   	*tls.Config
 		result           	*mongo.InsertOneResult
+		encryptedName     primitive.Binary
 		dekFindResult    	bson.M
 		dek              	primitive.Binary
+		findResult        bson.M
+		outputData        bson.M
 		err				 				error
 	)
 
