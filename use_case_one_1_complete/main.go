@@ -349,13 +349,15 @@ func main() {
 		fmt.Println("Removing nil")
 		delete(name, "otherNames")
 	}
-	// manually encrypt our firstName and lastName values:
+	// manually encrypt our firstName and lastName values
+	// use encryptedFirstName to search for the document later
 	encryptedFirstName, err := encryptManual(clientEncryption, employeeDEK, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["firstName"])
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
 		return
 	}
+	name["firstName"] = encryptedFirstName
 
 	name["lastName"], err = encryptManual(clientEncryption, employeeDEK, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["lastName"])
 	if err != nil {
