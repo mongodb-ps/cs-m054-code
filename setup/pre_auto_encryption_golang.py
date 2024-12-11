@@ -84,7 +84,7 @@ def make_dek(client: MongoClient, altName: str, provider_name: str, keyId: str) 
   employee_key_id = client.get_key_by_alt_name(str(altName))
   if employee_key_id == None:
     try:
-      master_key = {"keyId": keyId, "endpoint": "kmip-0:5696", "delegated": True}
+      master_key = {"keyId": keyId, "endpoint": "kmip-0:5696"}
       employee_key_id = client.create_data_key(kms_provider=provider_name, master_key=master_key, key_alt_names=[str(altName)])
     except EncryptionError as e:
       return None, f"ClientEncryption error: {e}"
@@ -104,6 +104,7 @@ def main():
   connection_string = "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(SDE_USER),
     quote_plus(SDE_PASSWORD),
+
     quote_plus(CA_PATH)
   )
 
@@ -124,7 +125,6 @@ def main():
   
   # declare our database and collection
   encrypted_db_name = "companyData"
-  encrypted_coll_name = "employee"
 
   # instantiate our MongoDB Client object
   client, err = mdb_client(connection_string)
@@ -139,36 +139,12 @@ def main():
           "db": keyvault_db,
           "collection": keyvault_coll
         },
-        "actions": [ "find", "insert", "remove"],
+        "actions": [ "find" ],
       }
     ],
     roles=[]
   )
   client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient", {"role": "readWrite", "db": encrypted_db_name}])
-
-  firstname = names.get_first_name()
-  lastname = names.get_last_name()
-  payload = {
-    "name": {
-      "firstName": firstname,
-      "lastName": lastname,
-      "otherNames": None,
-    },
-    "address": {
-      "streetAddress": "2 Bson Street",
-      "suburbCounty": "Mongoville",
-      "stateProvince": "Victoria",
-      "zipPostcode": "3999",
-      "country": "Oz"
-    },
-    "dob": datetime(1980, 10, 11),
-    "phoneNumber": "1800MONGO",
-    "salary": 999999.99,
-    "taxIdentifier": "78SD20NN001",
-    "role": [
-      "CIO"
-    ]
-  }
 
   # Instantiate our ClientEncryption object
   client_encryption = ClientEncryption(
@@ -184,20 +160,14 @@ def main():
     }
   )
 
-  # Retrieve the DEK UUID
-  data_key_id_1 = client_encryption.get_key_by_alt_name("dataKey1")
-  if data_key_id_1 is None:
-    data_key_id_1, err = make_dek(client_encryption, "dataKey1", provider, "1")
-    if err is not None:
-      print("Failed to find DEK")
-      sys.exit()
-  else:
-    data_key_id_1 = data_key_id_1["_id"]
-  
-  encrypted_db_name = "companyData"
-  encrypted_coll_name = "employee"
-  schema_map = {
-    "companyData.employee": {
+  data_key_id_1, err = make_dek(client_encryption, "dataKey1", provider, "1")
+  if err is not None:
+    print("Failed to find DEK")
+    sys.exit()
+
+  db = client["companyData"]
+  db.create_collection("employee", validator={
+    "$jsonSchema": {
       "bsonType": "object",
       "encryptMetadata": {
         "keyId": [data_key_id_1],
@@ -254,41 +224,7 @@ def main():
       }
     }
   }
-  db = client["companyData"]
-  db.create_collection("employee", validator={
-    "$jsonSchema": schema_map["companyData.employee"]
-})
-
-		
-  auto_encryption = AutoEncryptionOpts(
-    kms_provider,
-    keyvault_namespace,
-    schema_map = schema_map,
-    kms_tls_options = {
-      "kmip": {
-        "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/data/pki/server.pem"
-      }
-    },
-    crypt_shared_lib_required = True,
-    mongocryptd_bypass_spawn = True,
-    crypt_shared_lib_path = '/data/lib/mongo_crypt_v1.so'
-  )
-
-  secure_client, err = mdb_client(connection_string, auto_encryption_opts=auto_encryption)
-  if err is not None:
-    print(err)
-    sys.exit(1)
-
-  if payload["name"]["otherNames"] is None:
-    del(payload["name"]["otherNames"])
-
-  try:
-    result = secure_client[encrypted_db_name][encrypted_coll_name].insert_one(payload)
-    print(result.inserted_id)
-
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
+)
 
 if __name__ == "__main__":
   main()

@@ -87,7 +87,7 @@ def get_employee_key(client: MongoClient, altName: str, provider_name: str, keyI
   employee_key_id = client.get_key_by_alt_name(str(altName))
   if employee_key_id == None:
     try:
-      master_key = {"keyId": keyId, "endpoint": "kmip-0:5696"}
+      master_key = {"keyId": keyId, "endpoint": "kmip-0:5696", "delegated": True}
       employee_key_id = client.create_data_key(kms_provider=provider_name, master_key=master_key, key_alt_names=[str(altName)])
     except EncryptionError as e:
       return None, f"ClientEncryption error: {e}"
