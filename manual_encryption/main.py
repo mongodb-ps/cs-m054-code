@@ -135,7 +135,7 @@ def main():
   try:
 
     # retrieve the DEK UUID
-    data_key_id_1 = # Put code here to find the _id of the DEK we created previously
+    data_key_id_1 = <UPDATE_HERE> # Put code here to find the _id of the DEK we created previously using the "get_key_by_alt_name" method
     if data_key_id_1 is None:
       print("Failed to find DEK")
       sys.exit()

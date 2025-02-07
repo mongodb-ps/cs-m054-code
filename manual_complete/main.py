@@ -1,113 +1,22 @@
 try:
   from os import path
-  from sys import version_info
-  from bson.binary import STANDARD, Binary
-  from bson.codec_options import CodecOptions
   from datetime import datetime
-  from pymongo import MongoClient
-  from pymongo.encryption import Algorithm
-  from pymongo.encryption import ClientEncryption
-  from pymongo.errors import EncryptionError, ServerSelectionTimeoutError, ConnectionFailure
   from urllib.parse import quote_plus
   import sys
+  import dpath
+  from mongodb.mdb import MDB, ALG
+  from utils.utils import check_python_version, test_encrypted
 except ImportError as e:
+  from os import path
   print(f"Import error for {path.basename(__file__)}: {e}")
   exit(1)
-
 
 
 # PUT VALUES HERE!
 MDB_PASSWORD = "SuperP@ssword123!"
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
-
-def check_python_version() -> str | None:
-  """Checks if the current Python version is supported.
-
-  Returns:
-    A string indicating that the current Python version is not supported, or None if the current Python version is supported.
-  """
-  if version_info.major < 3 or (version_info.major == 3 and version_info.minor < 10):
-    return f"Python version {version_info.major}.{version_info.minor} is not supported, please use 3.10 or higher"
-  return None
-
-def mdb_client(connection_string: str, auto_encryption_opts: tuple[dict | None] = None) -> tuple[MongoClient | None, str | None]:
-  """ Returns a MongoDB client instance
-  
-  Creates a  MongoDB client instance and tests the client via a `hello` to the server
-  
-  Parameters
-  ------------
-    connection_string: string
-      MongoDB connection string URI containing username, password, host, port, tls, etc
-  Return
-  ------------
-    client: mongo.MongoClient
-      MongoDB client instance
-    err: error
-      Error message or None of successful
-  """
-
-  try:
-    client = MongoClient(connection_string)
-    client.admin.command('hello')
-    return client, None
-  except (ServerSelectionTimeoutError, ConnectionFailure) as e:
-    return None, f"Cannot connect to database, please check settings in config file: {e}"
-
-def decrypt_data(client_encryption, data):
-  """ Returns a decrypted value if the input is encrypted, or returns the input value
-
-  Tests the input value to determine if it is a BSON binary subtype 6 (aka encrypted data).
-  If true, the value is decrypted. If false the input value is returned
-
-  Parameters
-  -----------
-    client_encryption: mongo.ClientEncryption
-      Instantiated mongo.ClientEncryption instancesection
-    data: value
-      A value to be tested, and decrypted if required
-  Return
-  -----------
-    data/unencrypted_data: value
-      unencrypted or input value
-  """
-
-  try:
-    if type(data) == Binary and data.subtype == 6:
-
-      decrypted_data = client_encryption.decrypt(data)
-
-      return decrypted_data
-    else:
-      return data
-  except EncryptionError as e:
-    raise e
-
-def traverse_bson(client_encryption: ClientEncryption, data: dict) -> dict | str:
-  """ Iterates over a object/value and determines if the value is a scalar or document
-  
-  Tests the input value is a list or dictionary, if not calls the `decrypt_data` function, if
-  true it calls itself with the value as the input. 
-
-  Parameters
-  -----------
-    client_encryption: mongo.ClientEncryption
-      Instantiated mongo.ClientEncryption instance
-    data: value
-      A value to be tested, and decrypted if required
-  Return
-  -----------
-    data/unencrypted_data: value
-      unencrypted or input value
-  """
-  
-  if isinstance(data, list):
-    return [traverse_bson(client_encryption, v) for v in data]
-  elif isinstance(data, dict):
-    return {k: traverse_bson(client_encryption, v) for k, v in data.items()}
-  else:
-    return decrypt_data(client_encryption, data)
+TLSKEYCERT_PATH = "/data/pki/client-0.pem"
 
 def main():
 
@@ -143,27 +52,6 @@ def main():
   encrypted_db_name = "companyData"
   encrypted_coll_name = "employee"
 
-  # instantiate our MongoDB Client object
-  client, err = mdb_client(connection_string)
-  if err is not None:
-    print(err)
-    sys.exit(1)
-
-
-  # Instantiate our ClientEncryption object
-  client_encryption = ClientEncryption(
-    kms_provider,
-    keyvault_namespace,
-    client,
-    CodecOptions(uuid_representation=STANDARD),
-    kms_tls_options = {
-      "kmip": {
-        "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
-      }
-    }
-  )
-
   payload = {
     "name": {
       "firstName": "Kuber",
@@ -186,60 +74,65 @@ def main():
     ]
   }
 
-  try:
+  encrypted_fields = ["name/firstName", "name/lastName", "address", "dob", "phoneNumber", "salary", "taxIdentifier"]
+  det_encrypted_fields = ["name/firstName", "name/lastName"]
+  rand_encrypted_fields = ["address", "dob", "phoneNumber", "salary", "taxIdentifier"]
 
-    # Retrieve the DEK UUID
-    data_key_id_1 = client_encryption.get_key_by_alt_name("dataKey1")["_id"]
-    if data_key_id_1 is None:
-      print("Failed to find DEK")
+
+
+  # Instantiate our MDB class
+  mdb = MDB(connection_string, None, kms_provider, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
+
+  # Retrieve the DEK UUID
+  data_key_id_1 = mdb.get_dek_uuid("dataKey1")
+  if data_key_id_1 is None:
+    print("Failed to find DEK")
+    sys.exit()
+
+  # Encrypt our deterministic fields
+  for field in det_encrypted_fields:
+    current_value = dpath.get(payload, field)
+    new_value = mdb.encrypt_field(current_value, ALG.DET, data_key_id_1)
+    dpath.set(payload, field, new_value)
+
+  # Check for "None" value
+  if payload["name"]["otherNames"] is None:
+    del(payload["name"]["otherNames"])
+  else:
+    payload["name"]["otherNames"] = mdb.encrypt_field(payload["name"]["otherNames"], ALG.RAND, data_key_id_1)
+
+  # Encrypt our random fields
+  for field in rand_encrypted_fields:
+    current_value = dpath.get(payload, field)
+    new_value = mdb.encrypt_field(current_value, ALG.RAND, data_key_id_1)
+    dpath.set(payload, field, new_value)
+
+  # Test if the data is encrypted
+  for data in encrypted_fields:
+    encrypted = test_encrypted(dpath.get(payload, data))
+    if not encrypted:
+      print("Data is not encrypted")
       sys.exit()
 
-    # Do deterministic fields
-    payload["name"]["firstName"] = client_encryption.encrypt(payload["name"]["firstName"], Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Deterministic, data_key_id_1)
-    payload["name"]["lastName"] = client_encryption.encrypt(payload["name"]["lastName"], Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Deterministic, data_key_id_1)
+  # Extra test
+  if "otherNames" in payload["name"] and payload["name"]["otherNames"] is None:
+    print("None cannot be encrypted")
+    sys.exit(-1)
 
-    # Do random fields
-    if payload["name"]["otherNames"] is None:
-      del(payload["name"]["otherNames"])
-    else:
-      payload["name"]["otherNames"] = client_encryption.encrypt(payload["name"]["otherNames"], Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Random, data_key_id_1)
-    payload["address"] = client_encryption.encrypt(payload["address"], Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Random, data_key_id_1)
-    payload["dob"] = client_encryption.encrypt(payload["dob"], Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Random, data_key_id_1)
-    payload["phoneNumber"] = client_encryption.encrypt(payload["phoneNumber"], Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Random, data_key_id_1)
-    payload["salary"] = client_encryption.encrypt(payload["salary"], Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Random, data_key_id_1)
-    payload["taxIdentifier"] = client_encryption.encrypt(payload["taxIdentifier"], Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Random, data_key_id_1)
+  # Insert our document with encrypted values
+  result = mdb.insert_one(encrypted_db_name, encrypted_coll_name, payload)
+  print(result.inserted_id)
 
-    # Test if the data is encrypted
-    for data in [ payload["name"]["firstName"], payload["name"]["lastName"], payload["address"], payload["dob"], payload["phoneNumber"], payload["salary"], payload["taxIdentifier"]]:
-      if type(data) is not Binary or (type(data) is Binary and data.subtype != 6):
-        print("Data is not encrypted")
-        sys.exit()
+  # Encrypt our query value
+  encrypted_name = mdb.encrypt_field("Kuber", ALG.DET, data_key_id_1)
 
-    if "otherNames" in payload["name"] and payload["name"]["otherNames"] is None:
-      print("None cannot be encrypted")
-      sys.exit(-1)
+  # Query for our document
+  encrypted_doc = mdb.find_one(encrypted_db_name, encrypted_coll_name, {"name.firstName": encrypted_name})
+  print(encrypted_doc)
 
-    result = client[encrypted_db_name][encrypted_coll_name].insert_one(payload)
-
-    print(result.inserted_id)
-
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
-    sys.exit()
-
-
-  try:
-
-    encrypted_name = client_encryption.encrypt("Kuber", Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Deterministic, data_key_id_1)
-    encrypted_doc = client[encrypted_db_name][encrypted_coll_name].find_one({"name.firstName": encrypted_name})
-    print(encrypted_doc)
-
-    decrypted_doc = traverse_bson(client_encryption, encrypted_doc)
-    print(decrypted_doc)
-
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
-    sys.exit()
+  # Decrypt our document
+  decrypted_doc = mdb.decrypt_fields(encrypted_doc)
+  print(decrypted_doc)
 
 
 

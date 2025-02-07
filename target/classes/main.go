@@ -133,7 +133,7 @@ func main() {
 	var (
 		client           *mongo.Client
 		clientEncryption *mongo.ClientEncryption
-		connectionString = "mongodb://app_user:" + MDB_PASSWORD + "@" + STUDENTNAME + "02.dbservers.mdbps.internal/?replicaSet=rs0&tls=true&tlsCAFile=%2Fhome%2Fubuntu%2Fca.cert"
+		connectionString = "mongodb://app_user:" + MDB_PASSWORD + "@mongodb-0:27017/?replicaSet=rs0&tls=true&tlsCAFile=%2Fdata%2Fpki%2Fca.pem"
 		dek              primitive.Binary
 		employeeDEK      primitive.Binary
 		encryptedClient  *mongo.Client
@@ -142,7 +142,7 @@ func main() {
 		findResult			 bson.M
 		keyVaultColl 		 = "__keyVault"
 		keyVaultDB 			 = "__encryption"
-		kmipEndpoint     = STUDENTNAME + "01.kmipservers.mdbps.internal"
+		
 		kmipTLSConfig    *tls.Config
 		result           *mongo.InsertOneResult
 	)
