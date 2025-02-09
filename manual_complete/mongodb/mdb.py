@@ -34,11 +34,11 @@ class MDB:
     self.ca_file_path = ca_file_path
     self.tls_key_cert_path = tls_key_cert_path
     self.__client_encryption = None
-    self.__client, err = self.__get_client(connection_string)
+    self.__client, err = self.__get_client()
     if err is not None:
       self.result = err
 
-  def __get_client(self, connection_string: str, auto_encryption_opts: tuple[dict | None] = None) -> tuple[MongoClient | None, str | None]:
+  def __get_client(self, auto_encryption_opts: tuple[dict | None] = None) -> tuple[MongoClient | None, str | None]:
     """ Returns a MongoDB client instance
 
     Creates a  MongoDB client instance and tests the client via a `hello` to the server
@@ -141,9 +141,9 @@ class MDB:
           if err is not None:
             print(err)
             raise err
-      else:
-        print("`kms_provider` and/or `keyvault_namespacez not provided")
-        sys.exit(1)
+        else:
+          print("`kms_provider` and/or `keyvault_namespace not provided")
+          sys.exit(1)
       if algorithm == ALG.RAND:
         alg = Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Random
       else:
@@ -176,9 +176,9 @@ class MDB:
           if err is not None:
             print(err)
             raise err
-      else:
-        print("`kms_provider` and/or `keyvault_namespacez not provided")
-        sys.exit(1)
+        else:
+          print("`kms_provider` and/or `keyvault_namespace not provided")
+          sys.exit(1)
       # Test to determine if field is encrypted, if so, decrypt data
       if type(data) == Binary and data.subtype == 6:
 
@@ -271,7 +271,7 @@ class MDB:
           print(err)
           raise err
       else:
-        print("`kms_provider` and/or `keyvault_namespacez not provided")
+        print("`kms_provider` and/or `keyvault_namespace not provided")
         sys.exit(1)
     dek_uuid = self.__client_encryption.get_key_by_alt_name(dek_alt_name)
     if dek_uuid:

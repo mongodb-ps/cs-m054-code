@@ -34,7 +34,7 @@ class MDB:
     self.ca_file_path = ca_file_path
     self.tls_key_cert_path = tls_key_cert_path
     self.__client_encryption = None
-    self.__client, err = self.__get_client(connection_string)
+    self.__client, err = self.__get_client()
     if err is not None:
       self.result = err
 
@@ -128,9 +128,9 @@ class MDB:
           if err is not None:
             print(err)
             raise err
-      else:
-        print("`kms_provider` and/or `keyvault_namespacez not provided")
-        sys.exit(1)
+        else:
+          print("`kms_provider` and/or `keyvault_namespace not provided")
+          sys.exit(1)
       if algorithm == ALG.RAND:
         alg = <UPDATE_HERE> # Use th4e Algoirthm library to set the right algorithm for Random
       else:
@@ -178,7 +178,7 @@ class MDB:
           print(err)
           raise err
       else:
-        print("`kms_provider` and/or `keyvault_namespacez not provided")
+        print("`kms_provider` and/or `keyvault_namespace not provided")
         sys.exit(1)
     dek_uuid = self.__client_encryption.<UPDATE_HERE> # use the Alt name of the DEK to find the DEK
     if dek_uuid:
