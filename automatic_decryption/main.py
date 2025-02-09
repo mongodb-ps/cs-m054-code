@@ -1,60 +1,24 @@
 try:
   from os import path
-  from sys import version_info
-  from bson.binary import STANDARD, Binary, UUID_SUBTYPE
-  from bson import ObjectId
-  from bson.codec_options import CodecOptions
   from datetime import datetime
-  from pymongo import MongoClient
-  from pymongo.encryption_options import AutoEncryptionOpts
-  from pymongo.errors import EncryptionError, ServerSelectionTimeoutError, ConnectionFailure
   from urllib.parse import quote_plus
-  import names
   import sys
+  import names
+  from pymongo.encryption_options import AutoEncryptionOpts
+  from utils.utils import check_python_version
+  from mongodb.mdb import MDB
 except ImportError as e:
+  from os import path
   print(f"Import error for {path.basename(__file__)}: {e}")
   exit(1)
-
 
 # PUT VALUES HERE!
 
 MDB_PASSWORD = <UPDATE_HERE> 
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
-
-def check_python_version() -> str | None:
-  """Checks if the current Python version is supported.
-
-  Returns:
-    A string indicating that the current Python version is not supported, or None if the current Python version is supported.
-  """
-  if version_info.major < 3 or (version_info.major == 3 and version_info.minor < 10):
-    return f"Python version {version_info.major}.{version_info.minor} is not supported, please use 3.10 or higher"
-  return None
-
-def mdb_client(connection_string: str, auto_encryption_opts: tuple[dict | None] = None) -> tuple[MongoClient | None, str | None]:
-  """ Returns a MongoDB client instance
-  
-  Creates a  MongoDB client instance and tests the client via a `hello` to the server
-  
-  Parameters
-  ------------
-    connection_string: string
-      MongoDB connection string URI containing username, password, host, port, tls, etc
-  Return
-  ------------
-    client: mongo.MongoClient
-      MongoDB client instance
-    err: error
-      Error message or None of successful
-  """
-
-  try:
-    client = MongoClient(connection_string, auto_encryption_opts=auto_encryption_opts)
-    client.admin.command('hello')
-    return client, None
-  except (ServerSelectionTimeoutError, ConnectionFailure) as e:
-    return None, f"Cannot connect to database, please check settings in config file: {e}"
+TLSKEYCERT_PATH = "/data/pki/client-0.pem"
+SHARED_LIB_PATH = <UPDATE_HERE>
 
 def main():
 
@@ -68,7 +32,6 @@ def main():
   connection_string = "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(APP_USER),
     quote_plus(MDB_PASSWORD),
-
     quote_plus(CA_PATH)
   )
 
@@ -83,19 +46,13 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": <UPDATE_HERE>
+      "endpoint": "kmip-0:5696"
     }
   }
   
   # declare our database and collection
   encrypted_db_name = "companyData"
   encrypted_coll_name = "employee"
-
-  # instantiate our MongoDB Client object
-  client, err = mdb_client(connection_string)
-  if err is not None:
-    print(err)
-    sys.exit(1)
 
   firstname = names.get_first_name()
   lastname = names.get_last_name()
@@ -120,15 +77,20 @@ def main():
       "CIO"
     ]
   }
-
-  # retrieve the DEK UUID
-  data_key_id_1 = client[keyvault_db][keyvault_coll].find_one({"keyAltNames": "dataKey1"},{"_id": 1})["_id"]
-  if data_key_id_1 is None:
-    print("Failed to find DEK")
-    sys.exit()
   
   encrypted_db_name = "companyData"
   encrypted_coll_name = "employee"
+  
+  # Instantiate our MDB class
+  mdb = MDB(connection_string, kms_provider, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
+
+  # Retrieve the DEK UUID
+  data_key_id_1 = mdb.get_dek_uuid("dataKey1")
+  if data_key_id_1 is None:
+    print("Failed to find DEK")
+    sys.exit()
+
+  # Define our encrypted schema
   schema_map = {
     "companyData.employee": {
       "bsonType": "object",
@@ -187,41 +149,37 @@ def main():
       }
     }
   }
-
+  
   auto_encryption = AutoEncryptionOpts(
     kms_provider,
     keyvault_namespace,
     schema_map = schema_map,
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
+        "tlsCAFile": CA_PATH,
+        "tlsCertificateKeyFile": TLSKEYCERT_PATH
       }
     },
     crypt_shared_lib_required = True,
     mongocryptd_bypass_spawn = True,
-    crypt_shared_lib_path = '/data/lib/mongo_crypt_v1.so'
+    crypt_shared_lib_path = SHARED_LIB_PATH
   )
-
-  secure_client, err = mdb_client(connection_string, auto_encryption_opts=auto_encryption)
-  if err is not None:
-    print(err)
-    sys.exit(1)
 
   if payload["name"]["otherNames"] is None:
     del(payload["name"]["otherNames"])
 
-  try:
-    result = secure_client[encrypted_db_name][encrypted_coll_name].insert_one(payload)
-    print(result.inserted_id)
+  # Create the encrypred client in our MDB class
+  success = mdb.create_encrypted_client(auto_encryption)
+  if success is not None:
+    print(success)
+    sys.exit(1)
 
-    # WRITE YOUR QUERY HERE FOR AUTODECRYPTION. REMEMBER WHICH CLIENT TO USE!
-    decrypted_docs = # use a find_one
+  result = mdb.encrypted_insert_one(encrypted_db_name, encrypted_coll_name, payload)
+  print(result.inserted_id)
 
-    for doc in decrypted_docs:
-      print(doc)
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
+  decrypted_doc = mdb.encrypted_find_one(encrypted_db_name, encrypted_coll_name, {"name.firstName": firstname})
+
+  print(decrypted_doc)
 
 if __name__ == "__main__":
   main()
