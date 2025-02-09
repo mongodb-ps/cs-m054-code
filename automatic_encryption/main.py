@@ -18,7 +18,8 @@ MDB_PASSWORD = <UPDATE_HERE>
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 TLSKEYCERT_PATH = "/data/pki/client-0.pem"
-SHARED_LIB_PATH = <UPDATE_HERE>
+SHARED_LIB_PATH = <UPDATE_HERE> # absolute path of the `crypt_shared` library file
+KMIP_ADDR = <UPDATE_HERE> # Update for KMIP address and port, e.g. `hostname:port`
 
 def main():
 
@@ -46,7 +47,7 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": "kmip-0:5696"
+      "endpoint": KMIP_ADDR
     }
   }
   

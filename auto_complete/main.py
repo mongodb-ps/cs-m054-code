@@ -19,6 +19,7 @@ APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 TLSKEYCERT_PATH = "/data/pki/client-0.pem"
 SHARED_LIB_PATH = '/data/lib/mongo_crypt_v1.so'
+KMIP_ADDR = "kmip-0:5696"
 
 def main():
 
@@ -46,7 +47,7 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": "kmip-0:5696"
+      "endpoint": KMIP_ADDR
     }
   }
   

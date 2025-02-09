@@ -17,6 +17,7 @@ MDB_PASSWORD = "SuperP@ssword123!"
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 TLSKEYCERT_PATH = "/data/pki/client-0.pem"
+KMIP_ADDR = "kmip-0:5696"
 
 def main():
 
@@ -44,7 +45,7 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": "kmip-0:5696"
+      "endpoint": KMIP_ADDR
     }
   }
   

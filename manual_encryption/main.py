@@ -17,6 +17,7 @@ MDB_PASSWORD = <UPDATE_HERE>
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 TLSKEYCERT_PATH = "/data/pki/client-0.pem"
+KMIP_ADDR = <UPDATE_HERE> # Update for KMIP address and port, e.g. `hostname:port`
 
 def main():
 
@@ -44,7 +45,7 @@ def main():
   # declare our key provider attributes
   kms_provider = {
     provider: {
-      "endpoint": <UPDATE_HERE> # Set to the hostname and port of the KMIP device
+      "endpoint": KMIP_ADDR
     }
   }
   
