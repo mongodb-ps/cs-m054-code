@@ -28,12 +28,13 @@ class MDB:
       ca_file_path: tuple[str | None]=None,
       tls_key_cert_path: tuple[str | None]=None
     ) -> None:
-    self.__client, err = self.__get_client(connection_string)
+    self.connection_string = connection_string
     self.kms_provider = kms_provider
     self.keyvault_namespace = keyvault_namespace
     self.ca_file_path = ca_file_path
     self.tls_key_cert_path = tls_key_cert_path
     self.__client_encryption = None
+    self.__client, err = self.__get_client(connection_string)
     if err is not None:
       self.result = err
 
@@ -56,7 +57,10 @@ class MDB:
     """
 
     try:
-      client = MongoClient(self.connection_string, auto_encryption_opts=auto_encryption_opts)
+      if auto_encryption_opts is not None:
+        client = MongoClient(self.connection_string, auto_encryption_opts=auto_encryption_opts)
+      else:
+        client = MongoClient(self.connection_string)
       client.admin.command('hello')
       return client, None
     except (ServerSelectionTimeoutError, ConnectionFailure, OperationFailure) as e:
