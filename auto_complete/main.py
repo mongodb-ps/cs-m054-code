@@ -18,6 +18,7 @@ MDB_PASSWORD = "SuperP@ssword123!"
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 TLSKEYCERT_PATH = "/data/pki/client-0.pem"
+SHARED_LIB_PATH = '/data/lib/mongo_crypt_v1.so'
 
 def main():
 
@@ -81,7 +82,7 @@ def main():
   encrypted_coll_name = "employee"
   
   # Instantiate our MDB class
-  mdb = MDB(connection_string, None, kms_provider, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
+  mdb = MDB(connection_string, kms_provider, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
 
   # Retrieve the DEK UUID
   data_key_id_1 = mdb.get_dek_uuid("dataKey1")
@@ -155,13 +156,13 @@ def main():
     schema_map = schema_map,
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
+        "tlsCAFile": CA_PATH,
+        "tlsCertificateKeyFile": TLSKEYCERT_PATH
       }
     },
     crypt_shared_lib_required = True,
     mongocryptd_bypass_spawn = True,
-    crypt_shared_lib_path = '/data/lib/mongo_crypt_v1.so'
+    crypt_shared_lib_path = SHARED_LIB_PATH
   )
 
   if payload["name"]["otherNames"] is None:

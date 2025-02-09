@@ -79,7 +79,7 @@ def main():
   rand_encrypted_fields = ["address", "dob", "phoneNumber", "salary", "taxIdentifier"]
 
   # Instantiate our MDB class
-  mdb = MDB(connection_string, None, kms_provider, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
+  mdb = MDB(connection_string, kms_provider, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
 
   # Retrieve the DEK UUID
   data_key_id_1 = mdb.get_dek_uuid("dataKey1")
