@@ -157,7 +157,7 @@ class MDB:
       # Test to determine if fireld is encrypted, if so, decrypt data
       if type(data) == Binary and data.subtype == 6:
 
-        decrypted_data = self.__client_encryption.decrypt(data)
+        decrypted_data = self.__client_encryption.<UPDATE_HERE> # perform the decryption of single values
 
         return decrypted_data
       else:
