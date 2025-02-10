@@ -71,7 +71,7 @@ def get_employee_key(client, altName, provider_name, keyId):
   if employee_key_id == None:
     try:
       master_key = {"keyId": keyId, "endpoint": <UPDATE_HERE>
-      employee_key_id = client.create_data_key(kms_provider=provider_name, master_key=master_key, key_alt_names=[str(altName)])
+      employee_key_id = client.create_data_key(kms_provider_details=provider_name, master_key=master_key, key_alt_names=[str(altName)])
     except EncryptionError as e:
       return None, f"ClientEncryption error: {e}"
   else:
@@ -97,7 +97,7 @@ def main():
   provider = "kmip"
 
   # declare our key provider attributes
-  kms_provider = {
+  kms_provider_details = {
     provider: {
       "endpoint": <UPDATE_HERE>
     }
@@ -115,7 +115,7 @@ def main():
 
   # Create ClientEncryption instance for creating DEks and manual encryption
   client_encryption = ClientEncryption(
-    kms_provider,
+    kms_provider_details,
     keyvault_namespace,
     client,
     CodecOptions(uuid_representation=STANDARD),
@@ -230,7 +230,7 @@ def main():
   }
 
   auto_encryption = AutoEncryptionOpts(
-    kms_provider,
+    kms_provider_details,
     keyvault_namespace,
     schema_map = schema_map,
     kms_tls_options = {

@@ -23,13 +23,13 @@ class MDB:
   def __init__(
       self,
       connection_string: str,
-      kms_provider: tuple[dict | None]=None,
+      kms_provider_details: tuple[dict | None]=None,
       keyvault_namespace: tuple[str | None]=None,
       ca_file_path: tuple[str | None]=None,
       tls_key_cert_path: tuple[str | None]=None
     ) -> None:
     self.connection_string = connection_string
-    self.kms_provider = kms_provider
+    self.kms_provider_details = kms_provider_details
     self.keyvault_namespace = keyvault_namespace
     self.ca_file_path = ca_file_path
     self.tls_key_cert_path = tls_key_cert_path
@@ -72,7 +72,7 @@ class MDB:
 
     Parameters from class
     ------------
-    kms_provider (dict): A dictionary containing KMS (Key Management Service) provider details.
+    kms_provider_details (dict): A dictionary containing KMS (Key Management Service) provider details.
     keyvault_namespace (str): The namespace (database.collection) used for storing the encryption keys in the key vault.
     ca_file (str): Path to the Certificate Authority (CA) file for validating the KMS server.
     tls_key_cert (str): Path to the TLS certificate and private key file for authenticating the client to the KMS server.
@@ -93,7 +93,7 @@ class MDB:
     if self.tls_key_cert_path and not path.isfile(self.tls_key_cert_path):
       return None, f"{self.tls_key_cert_path} does not exist"
     client_encryption = ClientEncryption(
-      self.kms_provider,
+      self.kms_provider_details,
       self.keyvault_namespace,
       self.__client,
       CodecOptions(uuid_representation=STANDARD),
@@ -123,13 +123,13 @@ class MDB:
     try:
       # Create ClientEncryption object if not already existing
       if not self.__client_encryption:
-        if self.kms_provider and self.keyvault_namespace:
+        if self.kms_provider_details and self.keyvault_namespace:
           self.__client_encryption, err = self.__get_client_encryption()
           if err is not None:
             print(err)
             raise err
         else:
-          print("`kms_provider` and/or `keyvault_namespace not provided")
+          print("`kms_provider_details` and/or `keyvault_namespace not provided")
           sys.exit(1)
       if algorithm == ALG.RAND:
         alg = <UPDATE_HERE> # Use th4e Algoirthm library to set the right algorithm for Random
@@ -172,13 +172,13 @@ class MDB:
     """
     # Create ClientEncryption object if not already existing
     if not self.__client_encryption:
-      if self.kms_provider and self.keyvault_namespace:
+      if self.kms_provider_details and self.keyvault_namespace:
         self.__client_encryption, err = self.__get_client_encryption()
         if err is not None:
           print(err)
           raise err
       else:
-        print("`kms_provider` and/or `keyvault_namespace not provided")
+        print("`kms_provider_details` and/or `keyvault_namespace not provided")
         sys.exit(1)
     dek_uuid = self.__client_encryption.<UPDATE_HERE> # use the Alt name of the DEK to find the DEK
     if dek_uuid:

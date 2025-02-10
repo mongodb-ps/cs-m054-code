@@ -105,7 +105,7 @@ def main():
   provider = "aws"
 
   # declare our key provider attributes
-  kms_provider = {
+  kms_provider_details = {
     provider: {
       "accessKeyId": assumed_role_object['AccessKeyId'],
       "secretAccessKey": assumed_role_object['SecretAccessKey'],
@@ -192,7 +192,7 @@ def main():
   }
 
   auto_encryption = AutoEncryptionOpts(
-    kms_provider,
+    kms_provider_details,
     keyvault_namespace,
     schema_map = {schema_map},
     kms_tls_options = {

@@ -82,7 +82,7 @@ def main():
   provider = "kmip"
 
   # declare our key provider attributes
-  kms_provider = {
+  kms_provider_details = {
     provider: {
       "endpoint": <UPDATE_HERE>
     }
@@ -101,7 +101,7 @@ def main():
 
   # Instantiate our ClientEncryption object
   client_encryption = ClientEncryption(
-    kms_provider,
+    kms_provider_details,
     keyvault_namespace,
     client,
     CodecOptions(uuid_representation=STANDARD),
@@ -114,7 +114,7 @@ def main():
   )
 
   auto_encryption = AutoEncryptionOpts(
-    kms_provider,
+    kms_provider_details,
     keyvault_namespace,
     schema_map = , # WHAT DO WE PUT HERE?
     bypass_auto_encryption = True, # we do not want to autoencrypt

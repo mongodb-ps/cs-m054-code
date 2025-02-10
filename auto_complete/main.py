@@ -42,11 +42,11 @@ def main():
   keyvault_namespace = f"{keyvault_db}.{keyvault_coll}"
 
   # declare our key provider type
-  provider = "kmip"
+  kms_name = "kmip"
 
   # declare our key provider attributes
-  kms_provider = {
-    provider: {
+  kms_provider_details = {
+    kms_name: {
       "endpoint": KMIP_ADDR
     }
   }
@@ -83,13 +83,19 @@ def main():
   encrypted_coll_name = "employee"
   
   # Instantiate our MDB class
-  mdb = MDB(connection_string, kms_provider, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
+  mdb = MDB(connection_string, kms_name, kms_provider_details, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
+
+  # Create the ClientEncryption object so we can create and retrieve DEKs
+  fail = mdb.create_client_encryption()
+  if fail is not None:
+    print(fail)
+    sys.exit(1)
 
   # Retrieve the DEK UUID
   data_key_id_1 = mdb.get_dek_uuid("dataKey1")
   if data_key_id_1 is None:
     print("Failed to find DEK")
-    sys.exit()
+    sys.exit(1)
 
   # Define our encrypted schema
   schema_map = {
@@ -152,7 +158,7 @@ def main():
   }
   
   auto_encryption = AutoEncryptionOpts(
-    kms_provider,
+    kms_provider_details,
     keyvault_namespace,
     schema_map = schema_map,
     kms_tls_options = {
@@ -169,10 +175,10 @@ def main():
   if payload["name"]["otherNames"] is None:
     del(payload["name"]["otherNames"])
 
-  # Create the encrypred client in our MDB class
-  success = mdb.create_encrypted_client(auto_encryption)
-  if success is not None:
-    print(success)
+  # Create the encrypted client in our MDB class
+  fail = mdb.create_encrypted_client(auto_encryption)
+  if fail is not None:
+    print(fail)
     sys.exit(1)
 
   result = mdb.encrypted_insert_one(encrypted_db_name, encrypted_coll_name, payload)

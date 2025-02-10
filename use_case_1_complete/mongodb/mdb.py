@@ -1,23 +1,17 @@
 try:
   from os import path
   import sys
-  from enum import Enum
-  from typing import Any
+  from typing import Any, Union
 
-  from bson.binary import STANDARD, Binary, UUID
+  from bson.binary import STANDARD, UUID
   from bson.codec_options import CodecOptions
   from pymongo import MongoClient
-  from pymongo.encryption import Algorithm
   from pymongo.encryption import ClientEncryption
   from pymongo.errors import EncryptionError, ServerSelectionTimeoutError, ConnectionFailure, OperationFailure
 except ImportError as e:
   from os import path
   print(f"Import error for {path.basename(__file__)}: {e}")
   exit(1)
-
-class ALG(Enum):
-  RAND = 1
-  DET = 2
 
 class MDB:
   def __init__(
@@ -34,10 +28,10 @@ class MDB:
     self.ca_file_path = ca_file_path
     self.tls_key_cert_path = tls_key_cert_path
     self.__client_encryption = None
+    self.__encrypted_client = None
     self.__client, err = self.__get_client()
     if err is not None:
       self.result = err
-
 
   def __get_client(self, auto_encryption_opts: tuple[dict | None] = None) -> tuple[MongoClient | None, str | None]:
     """ Returns a MongoDB client instance
@@ -57,10 +51,7 @@ class MDB:
     """
 
     try:
-      if auto_encryption_opts is not None:
-        client = MongoClient(self.connection_string, auto_encryption_opts=auto_encryption_opts)
-      else:
-        client = MongoClient(self.connection_string)
+      client = MongoClient(self.connection_string, auto_encryption_opts=auto_encryption_opts)
       client.admin.command('hello')
       return client, None
     except (ServerSelectionTimeoutError, ConnectionFailure, OperationFailure) as e:
@@ -105,115 +96,31 @@ class MDB:
       }
     )
     return client_encryption, None
-
-  def decrypt_fields(self, data: dict) -> dict:
-    """ Public method for taking an object and then decrypting fields that are encrypted
-
-    Parameters
-    -----------
-      data: value
-        A value to be tested, and decrypted if required
-
-    Return
-    -----------
-      data/unencrypted_data: value    
-    """
-    return self.__traverse_bson(data)
   
-  def encrypt_field(self, field_v: any, algorithm: ALG, dek: str) -> Binary:
-    """ Public method for encrypting a field value
-
-    Parameters
-    -----------
-      field_v: value
-        A value to be encrypted
-      algorithm: "RAND" or "DET"
-      dek: UUID of the dek used to encrypt
-
-    Return
-    -----------
-      encrypted data in Binary Subtype 6    
+  def create_encrypted_client(self, auto_encryption_opts: dict) -> Union[str | None]:
     """
-    try:
-      # Create ClientEncryption object if not already existing
-      if not self.__client_encryption:
-        if self.kms_provider_details and self.keyvault_namespace:
-          self.__client_encryption, err = self.__get_client_encryption()
-          if err is not None:
-            print(err)
-            raise err
-        else:
-          print("`kms_provider_details` and/or `keyvault_namespace not provided")
-          sys.exit(1)
-      if algorithm == ALG.RAND:
-        alg = Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Random
-      else:
-        alg = Algorithm.AEAD_AES_256_CBC_HMAC_SHA_512_Deterministic
-      return self.__client_encryption.encrypt(field_v, alg, dek)
-    except EncryptionError as e:
-      raise e
+    Create and return an encrypted MongoDB client using the provided auto encryption options.
 
-  def decrypt_field(self, data):
-    """ Returns a decrypted value if the input is encrypted, or returns the input value
+    Parameters:
+    auto_encryption_opts (dict): A dictionary containing options for automatic encryption configuration.
 
-    Tests the input value to determine if it is a BSON binary subtype 6 (aka encrypted data).
-    If true, the value is decrypted. If false the input value is returned
+    Returns:
+    Union[str | None]:
+        - None if the encrypted client is successfully created.
+        - An error message (str) if the client creation fails.
 
-    Parameters
-    -----------
-      data: value
-        A value to be tested, and decrypted if required
-    Return
-    -----------
-      data/unencrypted_data: value
-        unencrypted or input value
+    Note:
+    This function creates an encrypted MongoDB client using the provided auto encryption options and assigns it to 
+    the instance variable `__encrypted_client`. It calls the `__get_client` method with the connection string 
+    and encryption options. If there is an error during client creation, the error message is stored in the `result`
+    instance variable and None is returned.
     """
+    self.__encrypted_client, err = self.__get_client(auto_encryption_opts)
+    if err is not None:
+      self.result = err
+    return None
 
-    try:
-      # Create ClientEncryption object if not already existing
-      if not self.__client_encryption:
-        if self.kms_provider_details and self.keyvault_namespace:
-          self.__client_encryption, err = self.__get_client_encryption()
-          if err is not None:
-            print(err)
-            raise err
-        else:
-          print("`kms_provider_details` and/or `keyvault_namespace not provided")
-          sys.exit(1)
-      # Test to determine if fireld is encrypted, if so, decrypt data
-      if type(data) == Binary and data.subtype == 6:
 
-        decrypted_data = self.__client_encryption.<UPDATE_HERE> # perform the decryption of single values
-
-        return decrypted_data
-      else:
-        return data
-    except EncryptionError as e:
-      raise e
-
-  def __traverse_bson(self, data: dict) -> dict | str:
-    """ Iterates over a object/value and determines if the value is a scalar or document
-
-    Tests the input value is a list or dictionary, if not calls the `decrypt_data` function, if
-    true it calls itself with the value as the input. 
-
-    Parameters
-    -----------
-      data: value
-        A value to be tested, and decrypted if required
-    Return
-    -----------
-      data/unencrypted_data: value
-        unencrypted or input value
-    """
-
-    if isinstance(data, list):
-      return [self.__traverse_bson(v) for v in data]
-    elif isinstance(data, dict):
-      return {k: self.__traverse_bson(v) for k, v in data.items()}
-    else:
-      return self.decrypt_field(data)
-    
   def insert_one(self, db, coll: str, document: dict) -> Any:
     """ Insert a document
 
@@ -232,6 +139,29 @@ class MDB:
 
     """
     return self.__client[db][coll].insert_one(document)
+
+  def encrypted_insert_one(self, db, coll: str, document: dict) -> Any:
+    """ Insert a document
+
+    Parameters
+    -----------
+      db: value
+        Name of database
+      coll: value
+        Name of collection
+      document: value
+        insert document
+    Return
+    -----------
+      Insert result: value
+        Result of operation
+
+    """
+    try:
+      result = self.__encrypted_client[db][coll].insert_one(document)
+      return result
+    except EncryptionError as e:
+      raise e
   
   def find_one(self, db, coll: str, document: dict) -> Any:
     """ Find a document
@@ -251,6 +181,29 @@ class MDB:
 
     """
     return self.__client[db][coll].find_one(document)
+  
+  def encrypted_find_one(self, db, coll: str, document: dict) -> Any:
+    """ Find a document
+
+    Parameters
+    -----------
+      db: value
+        Name of database
+      coll: value
+        Name of collection
+      document: value
+        query document
+    Return
+    -----------
+      Insert result: value
+        Result of operation
+
+    """
+    try:
+      result = self.__encrypted_client[db][coll].find_one(document)
+      return result
+    except EncryptionError as e:
+      raise e
   
   def get_dek_uuid(self, dek_alt_name: str) -> tuple[UUID | None]:
     """ Get UUID of a DEK searched by Alternative name

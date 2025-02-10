@@ -45,7 +45,7 @@ def main():
   provider = "kmip"
 
   # declare our key provider attributes
-  kms_provider = {
+  kms_provider_details = {
     provider: {
       "endpoint": KMIP_ADDR
     }
@@ -83,7 +83,7 @@ def main():
   encrypted_coll_name = "employee"
   
   # Instantiate our MDB class
-  mdb = MDB(connection_string, kms_provider, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
+  mdb = MDB(connection_string, kms_provider_details, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
 
   # Retrieve the DEK UUID
   data_key_id_1 = mdb.get_dek_uuid("dataKey1")
@@ -120,7 +120,7 @@ def main():
   }
   
   auto_encryption = AutoEncryptionOpts(
-    kms_provider,
+    kms_provider_details,
     keyvault_namespace,
     schema_map = schema_map,
     kms_tls_options = {

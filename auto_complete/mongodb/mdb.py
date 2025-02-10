@@ -3,9 +3,10 @@ try:
   import sys
   from typing import Any, Union
 
-  from bson.binary import STANDARD, UUID
+  from bson.binary import STANDARD, UUID, Binary
   from bson.codec_options import CodecOptions
   from pymongo import MongoClient
+  from pymongo.encryption import Algorithm
   from pymongo.encryption import ClientEncryption
   from pymongo.errors import EncryptionError, ServerSelectionTimeoutError, ConnectionFailure, OperationFailure
 except ImportError as e:
@@ -17,13 +18,15 @@ class MDB:
   def __init__(
       self,
       connection_string: str,
-      kms_provider: tuple[dict | None]=None,
-      keyvault_namespace: tuple[str | None]=None,
-      ca_file_path: tuple[str | None]=None,
-      tls_key_cert_path: tuple[str | None]=None
+      kms_name: Union[str, None],
+      kms_provider_details: Union[dict, None]=None,
+      keyvault_namespace: Union[str, None]=None,
+      ca_file_path: Union[str, None]=None,
+      tls_key_cert_path: Union[str, None]=None
     ) -> None:
     self.connection_string = connection_string
-    self.kms_provider = kms_provider
+    self.kms_name = kms_name
+    self.kms_provider_details = kms_provider_details
     self.keyvault_namespace = keyvault_namespace
     self.ca_file_path = ca_file_path
     self.tls_key_cert_path = tls_key_cert_path
@@ -33,7 +36,7 @@ class MDB:
     if err is not None:
       self.result = err
 
-  def __get_client(self, auto_encryption_opts: tuple[dict | None] = None) -> tuple[MongoClient | None, str | None]:
+  def __get_client(self, auto_encryption_opts: Union[dict, None] = None) -> tuple[MongoClient | None, str | None]:
     """ Returns a MongoDB client instance
 
     Creates a  MongoDB client instance and tests the client via a `hello` to the server
@@ -57,22 +60,21 @@ class MDB:
     except (ServerSelectionTimeoutError, ConnectionFailure, OperationFailure) as e:
       return None, f"Cannot connect to database, please check settings in config file: {e}"
   
-  def __get_client_encryption(self) -> tuple[ClientEncryption | None, str | None]:
+  def create_client_encryption(self) -> Union[str, None]:
     """ Create and return a ClientEncryption object for MongoDB client-side field level encryption, or return an error message if 
     the provided CA file or TLS key certificate file does not exist.
 
     Parameters from class
     ------------
-    kms_provider (dict): A dictionary containing KMS (Key Management Service) provider details.
+    kms_provider_details (dict): A dictionary containing KMS (Key Management Service) provider details.
     keyvault_namespace (str): The namespace (database.collection) used for storing the encryption keys in the key vault.
     ca_file (str): Path to the Certificate Authority (CA) file for validating the KMS server.
     tls_key_cert (str): Path to the TLS certificate and private key file for authenticating the client to the KMS server.
 
     Returns
     ------------
-    tuple[ClientEncryption | None, str | None]: 
-        - A tuple where the first element is a ClientEncryption object if successful, otherwise None.
-        - The second element is None if successful, otherwise an error message indicating which file was not found.
+    Union[str, None]: 
+        - None if successful, otherwise an error message indicating which file was not found.
 
     Note:
     This function verifies the existence of the provided CA file and TLS key certificate file before attempting to 
@@ -80,22 +82,25 @@ class MDB:
     The ClientEncryption object is used to perform explicit encryption and decryption operations on data.
     """
     if self.ca_file_path and not path.isfile(self.ca_file_path):
-      return None, f"{self.ca_file_path} does not exist"
+      return f"{self.ca_file_path} does not exist"
     if self.tls_key_cert_path and not path.isfile(self.tls_key_cert_path):
-      return None, f"{self.tls_key_cert_path} does not exist"
-    client_encryption = ClientEncryption(
-      self.kms_provider,
-      self.keyvault_namespace,
-      self.__client,
-      CodecOptions(uuid_representation=STANDARD),
-      kms_tls_options = {
-        "kmip": {
-          "tlsCAFile": self.ca_file_path,
-          "tlsCertificateKeyFile": self.tls_key_cert_path
+      return f"{self.tls_key_cert_path} does not exist"
+    try:
+      self.__client_encryption = ClientEncryption(
+        self.kms_provider_details,
+        self.keyvault_namespace,
+        self.__client,
+        CodecOptions(uuid_representation=STANDARD),
+        kms_tls_options = {
+          "kmip": {
+            "tlsCAFile": self.ca_file_path,
+            "tlsCertificateKeyFile": self.tls_key_cert_path
+          }
         }
-      }
-    )
-    return client_encryption, None
+      )
+    except ValueError as e:
+      return e
+    return None
   
   def create_encrypted_client(self, auto_encryption_opts: dict) -> Union[str | None]:
     """
@@ -117,7 +122,7 @@ class MDB:
     """
     self.__encrypted_client, err = self.__get_client(auto_encryption_opts)
     if err is not None:
-      self.result = err
+      return err
     return None
 
 
@@ -158,6 +163,9 @@ class MDB:
 
     """
     try:
+      if self.__encrypted_client is None:
+        print("Encrypted client not instantiated")
+        sys.exit(1)
       result = self.__encrypted_client[db][coll].insert_one(document)
       return result
     except EncryptionError as e:
@@ -200,6 +208,9 @@ class MDB:
 
     """
     try:
+      if self.__encrypted_client is None:
+        print("Encrypted client not instantiated")
+        sys.exit(1)
       result = self.__encrypted_client[db][coll].find_one(document)
       return result
     except EncryptionError as e:
@@ -217,16 +228,9 @@ class MDB:
       UUID or None
 
     """
-    # Create ClientEncryption object if not already existing
+    # Check the ClientEncryption object exists
     if not self.__client_encryption:
-      if self.kms_provider and self.keyvault_namespace:
-        self.__client_encryption, err = self.__get_client_encryption()
-        if err is not None:
-          print(err)
-          raise err
-      else:
-        print("`kms_provider` and/or `keyvault_namespacez not provided")
-        sys.exit(1)
+      raise f"ClientEncryption object is not instantiated"
     dek_uuid = self.__client_encryption.get_key_by_alt_name(dek_alt_name)
     if dek_uuid:
       return dek_uuid["_id"]

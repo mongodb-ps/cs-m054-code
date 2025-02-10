@@ -85,7 +85,7 @@ def make_dek(client: MongoClient, altName: str, provider_name: str, keyId: str) 
   if employee_key_id == None:
     try:
       master_key = {"keyId": keyId, "endpoint": "kmip-0:5696", "delegated": True}
-      employee_key_id = client.create_data_key(kms_provider=provider_name, master_key=master_key, key_alt_names=[str(altName)])
+      employee_key_id = client.create_data_key(kms_provider_details=provider_name, master_key=master_key, key_alt_names=[str(altName)])
     except EncryptionError as e:
       return None, f"ClientEncryption error: {e}"
   else:
@@ -116,7 +116,7 @@ def main():
   provider = "kmip"
 
   # declare our key provider attributes
-  kms_provider = {
+  kms_provider_details = {
     provider: {
       "endpoint": "kmip-0:5696"
     }
@@ -172,7 +172,7 @@ def main():
 
   # Instantiate our ClientEncryption object
   client_encryption = ClientEncryption(
-    kms_provider,
+    kms_provider_details,
     keyvault_namespace,
     client,
     CodecOptions(uuid_representation=STANDARD),
@@ -261,7 +261,7 @@ def main():
 
 		
   auto_encryption = AutoEncryptionOpts(
-    kms_provider,
+    kms_provider_details,
     keyvault_namespace,
     schema_map = schema_map,
     kms_tls_options = {
