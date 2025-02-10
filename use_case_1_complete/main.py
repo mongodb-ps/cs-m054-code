@@ -70,7 +70,7 @@ def get_employee_key(client, altName, provider_name, keyId):
     try:
       #PUT CODE HERE TO CREATE THE NEW DEK
       master_key = {"keyId": keyId, "endpoint": "kmip-0:5696", "delegated": True}
-      employee_key_id = client.create_data_key(kms_provider_details=provider_name, master_key=master_key, key_alt_names=[str(altName)])
+      employee_key_id = client.create_data_key(kms_provider=provider_name, master_key=master_key, key_alt_names=[str(altName)])
     except EncryptionError as e:
       return None, f"ClientEncryption error: {e}"
   else:
