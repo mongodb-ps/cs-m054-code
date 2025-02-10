@@ -59,7 +59,10 @@ class MDB:
     """
 
     try:
-      client = MongoClient(self.connection_string, auto_encryption_opts=auto_encryption_opts)
+      if auto_encryption_opts is not None:
+        client = MongoClient(self.connection_string, auto_encryption_opts=auto_encryption_opts)
+      else:
+        client = MongoClient(self.connection_string)
       client.admin.command('hello')
       return client, None
     except (ServerSelectionTimeoutError, ConnectionFailure, OperationFailure) as e:

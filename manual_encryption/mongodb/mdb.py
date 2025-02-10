@@ -2,7 +2,7 @@ try:
   from os import path
   import sys
   from enum import Enum
-  from typing import Any
+  from typing import Any, Union
 
   from bson.binary import STANDARD, Binary, UUID
   from bson.codec_options import CodecOptions
@@ -23,12 +23,14 @@ class MDB:
   def __init__(
       self,
       connection_string: str,
+      kms_name: Union[str, None],
       kms_provider_details: tuple[dict | None]=None,
       keyvault_namespace: tuple[str | None]=None,
       ca_file_path: tuple[str | None]=None,
       tls_key_cert_path: tuple[str | None]=None
     ) -> None:
     self.connection_string = connection_string
+    self.kms_name = kms_name
     self.kms_provider_details = kms_provider_details
     self.keyvault_namespace = keyvault_namespace
     self.ca_file_path = ca_file_path
@@ -37,7 +39,6 @@ class MDB:
     self.__client, err = self.__get_client()
     if err is not None:
       self.result = err
-
 
   def __get_client(self, auto_encryption_opts: tuple[dict | None] = None) -> tuple[MongoClient | None, str | None]:
     """ Returns a MongoDB client instance
@@ -66,7 +67,7 @@ class MDB:
     except (ServerSelectionTimeoutError, ConnectionFailure, OperationFailure) as e:
       return None, f"Cannot connect to database, please check settings in config file: {e}"
   
-  def __get_client_encryption(self) -> tuple[ClientEncryption | None, str | None]:
+  def create_client_encryption(self) -> Union[str, None]:
     """ Create and return a ClientEncryption object for MongoDB client-side field level encryption, or return an error message if 
     the provided CA file or TLS key certificate file does not exist.
 
@@ -79,9 +80,8 @@ class MDB:
 
     Returns
     ------------
-    tuple[ClientEncryption | None, str | None]: 
-        - A tuple where the first element is a ClientEncryption object if successful, otherwise None.
-        - The second element is None if successful, otherwise an error message indicating which file was not found.
+    Union[str, None]: 
+        - None if successful, otherwise an error message indicating which file was not found.
 
     Note:
     This function verifies the existence of the provided CA file and TLS key certificate file before attempting to 
@@ -89,22 +89,25 @@ class MDB:
     The ClientEncryption object is used to perform explicit encryption and decryption operations on data.
     """
     if self.ca_file_path and not path.isfile(self.ca_file_path):
-      return None, f"{self.ca_file_path} does not exist"
+      return f"{self.ca_file_path} does not exist"
     if self.tls_key_cert_path and not path.isfile(self.tls_key_cert_path):
-      return None, f"{self.tls_key_cert_path} does not exist"
-    client_encryption = ClientEncryption(
-      self.kms_provider_details,
-      self.keyvault_namespace,
-      self.__client,
-      CodecOptions(uuid_representation=STANDARD),
-      kms_tls_options = {
-        "kmip": {
-          "tlsCAFile": self.ca_file_path,
-          "tlsCertificateKeyFile": self.tls_key_cert_path
+      return f"{self.tls_key_cert_path} does not exist"
+    try:
+      self.__client_encryption = ClientEncryption(
+        self.kms_provider_details,
+        self.keyvault_namespace,
+        self.__client,
+        CodecOptions(uuid_representation=STANDARD),
+        kms_tls_options = {
+          "kmip": {
+            "tlsCAFile": self.ca_file_path,
+            "tlsCertificateKeyFile": self.tls_key_cert_path
+          }
         }
-      }
-    )
-    return client_encryption, None
+      )
+    except ValueError as e:
+      return e
+    return None
   
   def encrypt_field(self, field_v: any, algorithm: ALG, dek: str) -> Binary:
     """ Public method for encrypting a field value
@@ -121,21 +124,14 @@ class MDB:
       encrypted data in Binary Subtype 6    
     """
     try:
-      # Create ClientEncryption object if not already existing
+      # Check the ClientEncryption object exists
       if not self.__client_encryption:
-        if self.kms_provider_details and self.keyvault_namespace:
-          self.__client_encryption, err = self.__get_client_encryption()
-          if err is not None:
-            print(err)
-            raise err
-        else:
-          print("`kms_provider_details` and/or `keyvault_namespace not provided")
-          sys.exit(1)
+        raise f"ClientEncryption object is not instantiated"
       if algorithm == ALG.RAND:
         alg = <UPDATE_HERE> # Use th4e Algoirthm library to set the right algorithm for Random
       else:
         alg = <UPDATE_HERE> # Use th4e Algoirthm library to set the right algorithm for Deterministic
-      return self.__client_encryption<UPDATE_HERE> # Perform the encryption
+      return self.__client_encryption.<UPDATE_HERE> # Perform the encryption
     except EncryptionError as e:
       raise e
     
@@ -170,16 +166,9 @@ class MDB:
       UUID or None
 
     """
-    # Create ClientEncryption object if not already existing
+    # Check the ClientEncryption object exists
     if not self.__client_encryption:
-      if self.kms_provider_details and self.keyvault_namespace:
-        self.__client_encryption, err = self.__get_client_encryption()
-        if err is not None:
-          print(err)
-          raise err
-      else:
-        print("`kms_provider_details` and/or `keyvault_namespace not provided")
-        sys.exit(1)
+      raise f"ClientEncryption object is not instantiated"
     dek_uuid = self.__client_encryption.<UPDATE_HERE> # use the Alt name of the DEK to find the DEK
     if dek_uuid:
       return dek_uuid["_id"]

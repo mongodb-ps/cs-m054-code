@@ -1,12 +1,12 @@
 try:
   from os import path
   import sys
+  from enum import Enum
   from typing import Any, Union
 
   from bson.binary import STANDARD, UUID, Binary
   from bson.codec_options import CodecOptions
   from pymongo import MongoClient
-  from pymongo.encryption import Algorithm
   from pymongo.encryption import ClientEncryption
   from pymongo.errors import EncryptionError, ServerSelectionTimeoutError, ConnectionFailure, OperationFailure
 except ImportError as e:
@@ -54,7 +54,10 @@ class MDB:
     """
 
     try:
-      client = MongoClient(self.connection_string, auto_encryption_opts=auto_encryption_opts)
+      if auto_encryption_opts is not None:
+        client = MongoClient(self.connection_string, auto_encryption_opts=auto_encryption_opts)
+      else:
+        client = MongoClient(self.connection_string)
       client.admin.command('hello')
       return client, None
     except (ServerSelectionTimeoutError, ConnectionFailure, OperationFailure) as e:
