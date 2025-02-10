@@ -266,7 +266,8 @@ class MDB:
       result = self.__encrypted_client[db][coll].find_one(document)
       return result
     except EncryptionError as e:
-      raise f"Find error: {e}"
+      print(f"Find error: {e}")
+      return None 
   
   def create_get_dek_uuid(self, dek_alt_name: str, master_key_id: Union[str, dict]) -> tuple[UUID | None]:
     """ Get UUID of a DEK searched by Alternative name

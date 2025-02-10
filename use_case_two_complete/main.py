@@ -196,10 +196,10 @@ def main():
     del(payload["name"]["otherNames"])
 
   result = mdb.encrypted_insert_one(encrypted_db_name, encrypted_coll_name, payload)
-  print(result.inserted_id)
+  print(f"Insert _id: {result.inserted_id}")
 
   result = mdb.encrypted_find_one(encrypted_db_name, encrypted_coll_name, {"name.firstName": firstname, "name.lastName": lastname})
-  print(result)
+  print(f"Find result: {result}")
 
   result = mdb.delete_one(keyvault_db, keyvault_coll, {"keyAltNames": employee_id})
   result = mdb.encrypted_find_one(encrypted_db_name, encrypted_coll_name, {"name.firstName": firstname, "name.lastName": lastname})
