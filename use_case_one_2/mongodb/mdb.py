@@ -271,8 +271,8 @@ class MDB:
       return dek_uuid["_id"]
     else:
       try:
-        master_key = {"keyId": master_key_id, "endpoint": self.kms_provider_details[self.kms_name]["endpoint"], "delegated": True}
-        dek_uuid = self.__client_encryption.create_data_key(kms_provider=self.kms_name , master_key=master_key, key_alt_names=[dek_alt_name])
+        master_key = {<UPDATE_HERE>, <UPDATE_HERE>, "delegated": True} # create the master key object using our KMIP device
+        dek_uuid = self.__client_encryption.<UPDATE_HERE> # create the DEK here
         if dek_uuid:
           return dek_uuid
       except EncryptionError as e:

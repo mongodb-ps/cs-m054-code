@@ -87,6 +87,7 @@ def main():
   
   encrypted_db_name = "companyData"
   encrypted_coll_name = "employee"
+  
   schema_map = {
     "companyData.employee": {
       "bsonType": "object",
