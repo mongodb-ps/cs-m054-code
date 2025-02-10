@@ -1,30 +1,27 @@
 try:
   from os import path
-  from sys import version_info
-  from bson.binary import STANDARD, Binary, UUID_SUBTYPE
-  from bson.codec_options import CodecOptions
   from datetime import datetime
-  from pprint import pprint
-  from pymongo import MongoClient
-  from pymongo.encryption import Algorithm
-  from pymongo.encryption import ClientEncryption
-  from pymongo.encryption_options import AutoEncryptionOpts
-  from pymongo.errors import EncryptionError, ServerSelectionTimeoutError, ConnectionFailure
-  from random import randint
-  from time import sleep
   from urllib.parse import quote_plus
-  import names
   import sys
+  import names
+  from random import randint
+
+  from pymongo.encryption_options import AutoEncryptionOpts
+  from utils.utils import check_python_version
+  from mongodb.mdb import MDB
 except ImportError as e:
+  from os import path
   print(f"Import error for {path.basename(__file__)}: {e}")
   exit(1)
-
 
 # PUT VALUES HERE!
 
 MDB_PASSWORD = "SuperP@ssword123!"
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
+TLSKEYCERT_PATH = "/data/pki/client-0.pem"
+SHARED_LIB_PATH = '/data/lib/mongo_crypt_v1.so'
+KMIP_ADDR = "kmip-0:5696"
 
 def check_python_version() -> str | None:
   """Checks if the current Python version is supported.
@@ -110,11 +107,11 @@ def main():
   keyvault_namespace = f"{keyvault_db}.{keyvault_coll}"
 
   # declare our key provider type
-  provider = "kmip"
+  kms_name = "kmip"
 
   # declare our key provider attributes
   kms_provider_details = {
-    provider: {
+    kms_name: {
       "endpoint": "kmip-0:5696" 
     }
   }
@@ -123,41 +120,30 @@ def main():
   encrypted_db_name = "companyData"
   encrypted_coll_name = "employee"
 
-  # instantiate our MongoDB Client object
-  client, err = mdb_client(connection_string)
-  if err is not None:
-    print(err)
-    sys.exit(1)
-
-  # Create ClientEncryption instance for creating DEks and manual encryption
-  client_encryption = ClientEncryption(
-    kms_provider_details,
-    keyvault_namespace,
-    client,
-    CodecOptions(uuid_representation=STANDARD),
-    kms_tls_options = {
-      "kmip": {
-        "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
-      }
-    }
-  )
-
   employee_id = str("%05d" % randint(0,99999))
   firstname = names.get_first_name()
   lastname = names.get_last_name()
 
-  # PUT CODE HERE TO RETRIEVE OUR COMMON (our first) DEK:
-  data_key_id_1 = client[keyvault_db][keyvault_coll].find_one({"keyAltNames": "dataKey1"},{"_id": 1})["_id"]
-  if data_key_id_1 is None:
-    print("Common DEK missing")
+  # Instantiate our MDB class
+  mdb = MDB(connection_string, kms_name, kms_provider_details, keyvault_namespace, CA_PATH, TLSKEYCERT_PATH)
+
+  # Create the ClientEncryption object so we can create and retrieve DEKs
+  fail = mdb.create_client_encryption()
+  if fail is not None:
+    print(fail)
     sys.exit(1)
 
-  # retrieve the DEK UUID
-  _, err = get_employee_key(client_encryption, employee_id, provider, '1')
-  if err is not None:
-    print(f"User DEK missing: {err}")
-    sys.exit(1)
+  # Retrieve or create the common DEK UUID
+  data_key_id_1 = mdb.create_get_dek_uuid("dataKey1", "1")
+  if data_key_id_1 is None:
+    print("Failed to find DEK")
+    sys.exit()
+
+  # Retrieve or create the user DEK UUID
+  employee_key_id = mdb.create_get_dek_uuid(employee_id, "1")
+  if employee_key_id is None:
+    print("Failed to find DEK")
+    sys.exit()
 
   payload = {
     "_id": employee_id,
@@ -289,6 +275,7 @@ def main():
   result = encrypted_db[encrypted_coll_name].find_one({"name.firstName": firstname, "name.lastName": lastname})
   pprint(result)
 
+  # wait 60 seconds
   sleep(60)
 
   try: 
