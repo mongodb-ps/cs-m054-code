@@ -5,6 +5,7 @@ try:
   import sys
   import names
   from random import randint
+  from time import sleep
 
   from pymongo.encryption_options import AutoEncryptionOpts
   from utils.utils import check_python_version
@@ -23,76 +24,13 @@ TLSKEYCERT_PATH = "/data/pki/client-0.pem"
 SHARED_LIB_PATH = '/data/lib/mongo_crypt_v1.so'
 KMIP_ADDR = "kmip-0:5696"
 
-def check_python_version() -> str | None:
-  """Checks if the current Python version is supported.
-
-  Returns:
-    A string indicating that the current Python version is not supported, or None if the current Python version is supported.
-  """
-  if version_info.major < 3 or (version_info.major == 3 and version_info.minor < 10):
-    return f"Python version {version_info.major}.{version_info.minor} is not supported, please use 3.10 or higher"
-  return None
-
-def mdb_client(connection_string: str, auto_encryption_opts: tuple[dict | None] = None) -> tuple[MongoClient | None, str | None]:
-  """ Returns a MongoDB client instance
-  
-  Creates a  MongoDB client instance and tests the client via a `hello` to the server
-  
-  Parameters
-  ------------
-    connection_string: string
-      MongoDB connection string URI containing username, password, host, port, tls, etc
-  Return
-  ------------
-    client: mongo.MongoClient
-      MongoDB client instance
-    err: error
-      Error message or None of successful
-  """
-
-  try:
-    client = MongoClient(connection_string, auto_encryption_opts=auto_encryption_opts)
-    client.admin.command('hello')
-    return client, None
-  except (ServerSelectionTimeoutError, ConnectionFailure) as e:
-    return None, f"Cannot connect to database, please check settings in config file: {e}"
-
-def get_employee_key(client: MongoClient, altName: str, provider_name: str, keyId: str) -> tuple[str | None, str | None]:
-  """ Return a DEK's UUID for a give KeyAltName. Creates a new DEK if the DEK is not found.
-  
-  Queries a key vault for a particular KeyAltName and returns the UUID of the DEK, if found.
-  If not found, the UUID and Key Provider object and CMK ID are used to create a new DEK
-
-  Parameters
-  -----------
-    client: mongo.ClientEncryption
-      An instantiated ClientEncryption instance that has access to the key vault
-    altName: string
-      The KeyAltName of the UUID to find
-    provider_name: string
-      The name of the key provider. "aws", "gcp", "azure", "kmip", or "local"
-    keyId: string
-      The key ID for the Customer Master Key (CMK)
-  Return
-  -----------
-    employee_key_id: UUID
-      The UUID of the DEK
-    error: error
-      Error message or None of successful
-  """
-  
-  employee_key_id = client.get_key_by_alt_name(str(altName))
-  if employee_key_id == None:
-    try:
-      master_key = {"keyId": keyId, "endpoint": "kmip-0:5696", "delegated": True}
-      employee_key_id = client.create_data_key(kms_provider_details=provider_name, master_key=master_key, key_alt_names=[str(altName)])
-    except EncryptionError as e:
-      return None, f"ClientEncryption error: {e}"
-  else:
-    employee_key_id = employee_key_id["_id"]
-  return employee_key_id, None
-
 def main():
+
+  # check version of Python is correct
+  err = check_python_version()
+  if err is not None:
+    print(err)
+    exit(1)
 
   # Obviously this should not be hardcoded
   connection_string = "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
@@ -170,6 +108,7 @@ def main():
 
   encrypted_db_name = "companyData"
   encrypted_coll_name = "employee"
+
   schema_map = {
     "companyData.employee": {
       "bsonType": "object",
@@ -237,56 +176,40 @@ def main():
     schema_map = schema_map,
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
+        "tlsCAFile": CA_PATH,
+        "tlsCertificateKeyFile": TLSKEYCERT_PATH
       }
     },
     crypt_shared_lib_required = True,
     mongocryptd_bypass_spawn = True,
-    crypt_shared_lib_path = '/data/lib/mongo_crypt_v1.so'
+    crypt_shared_lib_path = SHARED_LIB_PATH
   )
 
-  secure_client, err = mdb_client(connection_string, auto_encryption_opts=auto_encryption)
-  if err is not None:
-    print(err)
+  # Create the encrypted client in our MDB class
+  fail = mdb.create_encrypted_client(auto_encryption)
+  if fail is not None:
+    print(fail)
     sys.exit(1)
-  encrypted_db = secure_client[encrypted_db_name]
 
   # remove `name.otherNames` if None because wwe cannot encrypt none
   if payload["name"]["otherNames"] is None:
     del(payload["name"]["otherNames"])
 
-  try:
-    result = encrypted_db[encrypted_coll_name].insert_one(payload)
-    print(result.inserted_id)
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
-    sys.exit(1)
+  result = mdb.encrypted_insert_one(encrypted_db_name, encrypted_coll_name, payload)
+  print(result.inserted_id)
 
-  try: 
-    result = encrypted_db[encrypted_coll_name].find_one({"name.firstName": firstname, "name.lastName": lastname})
+  result = mdb.encrypted_find_one(encrypted_db_name, encrypted_coll_name, {"name.firstName": firstname, "name.lastName": lastname})
+  print(result)
 
-    pprint(result)
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
-    sys.exit(1)
-
-  client[keyvault_db][keyvault_coll].delete_one({"keyAltNames": employee_id})
-  result = encrypted_db[encrypted_coll_name].find_one({"name.firstName": firstname, "name.lastName": lastname})
-  pprint(result)
+  result = mdb.delete_one(keyvault_db, keyvault_coll, {"keyAltNames": employee_id})
+  result = mdb.encrypted_find_one(encrypted_db_name, encrypted_coll_name, {"name.firstName": firstname, "name.lastName": lastname})
+  print(result)
 
   # wait 60 seconds
   sleep(60)
 
-  try: 
-    result = encrypted_db[encrypted_coll_name].find_one({"name.firstName": firstname, "name.lastName": lastname})
-    
-    pprint(result)
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
-    sys.exit(1)
-
-
+  result = mdb.encrypted_find_one(encrypted_db_name, encrypted_coll_name, {"name.firstName": firstname, "name.lastName": lastname})
+  print(result)
 
 if __name__ == "__main__":
   main()

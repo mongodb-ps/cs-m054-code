@@ -49,7 +49,7 @@ def main():
   # declare our key provider attributes
   kms_provider_details = {
     kms_name: {
-      "endpoint": "kmip-0:5696" 
+      "endpoint": KMIP_ADDR
     }
   }
   
@@ -175,13 +175,13 @@ def main():
     schema_map = schema_map,
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
+        "tlsCAFile": CA_PATH,
+        "tlsCertificateKeyFile": TLSKEYCERT_PATH
       }
     },
     crypt_shared_lib_required = True,
     mongocryptd_bypass_spawn = True,
-    crypt_shared_lib_path = '/data/lib/mongo_crypt_v1.so'
+    crypt_shared_lib_path = SHARED_LIB_PATH
   )
 
   # Create the encrypted client in our MDB class

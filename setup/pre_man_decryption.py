@@ -70,7 +70,7 @@ def make_dek(client: MongoClient, altName: str, provider_name: str, keyId: str) 
   if employee_key_id == None:
     try:
       master_key = {"keyId": keyId, "endpoint": "kmip-0:5696", "delegated": True}
-      employee_key_id = client.create_data_key(kms_provider_details=provider_name, master_key=master_key, key_alt_names=[str(altName)])
+      employee_key_id = client.create_data_key(kms_provider=provider_name, master_key=master_key, key_alt_names=[str(altName)])
     except EncryptionError as e:
       return None, f"ClientEncryption error: {e}"
   else:
