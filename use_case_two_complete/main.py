@@ -50,7 +50,7 @@ def main():
   # declare our key provider attributes
   kms_provider_details = {
     kms_name: {
-      "endpoint": "kmip-0:5696" 
+      "endpoint": KMIP_ADDR
     }
   }
   
@@ -202,8 +202,9 @@ def main():
   print(f"Find result: {result}")
 
   result = mdb.delete_one(keyvault_db, keyvault_coll, {"keyAltNames": employee_id})
+  print("DEK deleted")
   result = mdb.encrypted_find_one(encrypted_db_name, encrypted_coll_name, {"name.firstName": firstname, "name.lastName": lastname})
-  print(result)
+  print(f"Post DEK delete result: {result}")
 
   # wait 60 seconds
   sleep(60)

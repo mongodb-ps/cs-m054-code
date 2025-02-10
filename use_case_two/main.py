@@ -5,24 +5,24 @@ try:
   import sys
   import names
   from random import randint
+  from time import sleep
 
   from pymongo.encryption_options import AutoEncryptionOpts
-  from utils.utils import check_python_version, test_encrypted
-  from mongodb.mdb import MDB, ALG
+  from utils.utils import check_python_version
+  from mongodb.mdb import MDB
 except ImportError as e:
   from os import path
   print(f"Import error for {path.basename(__file__)}: {e}")
   exit(1)
 
-
 # PUT VALUES HERE!
 
-MDB_PASSWORD = <UPDATE_HERE> 
+MDB_PASSWORD = <UPDATE_HERE>
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 TLSKEYCERT_PATH = "/data/pki/client-0.pem"
 SHARED_LIB_PATH = '/data/lib/mongo_crypt_v1.so'
-KMIP_ADDR = <UPDATE_HERE> # Update for KMIP address and port, e.g. `hostname:port`
+KMIP_ADDR = <UPDATE_HERE>
 
 def main():
 
@@ -36,7 +36,6 @@ def main():
   connection_string = "mongodb://%s:%s@mongodb-0:27017/?serverSelectionTimeoutMS=5000&tls=true&tlsCAFile=%s" % (
     quote_plus(APP_USER),
     quote_plus(MDB_PASSWORD),
-
     quote_plus(CA_PATH)
   )
 
@@ -109,6 +108,7 @@ def main():
 
   encrypted_db_name = "companyData"
   encrypted_coll_name = "employee"
+
   schema_map = {
     "companyData.employee": {
       "bsonType": "object",
@@ -176,44 +176,41 @@ def main():
     schema_map = schema_map,
     kms_tls_options = {
       "kmip": {
-        "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/data/pki/client-0.pem"
+        "tlsCAFile": CA_PATH,
+        "tlsCertificateKeyFile": TLSKEYCERT_PATH
       }
     },
     crypt_shared_lib_required = True,
     mongocryptd_bypass_spawn = True,
-    crypt_shared_lib_path = '/data/lib/mongo_crypt_v1.so'
+    crypt_shared_lib_path = SHARED_LIB_PATH
   )
 
-  secure_client, err = mdb_client(connection_string, auto_encryption_opts=auto_encryption)
-  if err is not None:
-    print(err)
+  # Create the encrypted client in our MDB class
+  fail = mdb.create_encrypted_client(auto_encryption)
+  if fail is not None:
+    print(fail)
     sys.exit(1)
-  encrypted_db = secure_client[encrypted_db_name]
 
   # remove `name.otherNames` if None because wwe cannot encrypt none
-  if payload["name"]["otherNames"] == None:
+  if payload["name"]["otherNames"] is None:
     del(payload["name"]["otherNames"])
 
-  try:
-    result = encrypted_db[encrypted_coll_name].insert_one(payload)
-    print(result.inserted_id)
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
-    sys.exit(1)
+  result = mdb.encrypted_insert_one(encrypted_db_name, encrypted_coll_name, payload)
+  print(f"Insert _id: {result.inserted_id}")
 
-  result = # PUT CODE HERE TO RETRIEVE DOCUMENT
-  pprint(result)
+  result = mdb.<UPDATE_HERE> # PUT CODE HERE TO RETRIEVE DOCUMENT
+  print(f"Find result: {result}")
 
   # WRITE CODE TO DELETE EMPLOYEE's DEK HERE
+  result =  mdb.<UPDATE_HERE>
+  print("DEK deleted")
+  result = mdb.<UPDATE_HERE> # PUT CODE HERE TO RETRIEVE DOCUMENT
+  print(f"Post DEK delete result: {result}")
 
-  result = # PUT CODE HERE TO RETRIEVE DOCUMENT
-  pprint(result)
+  sleep(60)
 
-  # PUT SLEEP HERE
-
-  result = # PUT CODE HERE TO RETRIEVE DOCUMENT, REMEMBER TO HANDLE ERRORS!
-  pprint(result)
+  result =  mdb.<UPDATE_HERE> # PUT CODE HERE TO RETRIEVE DOCUMENT!
+  print(result) # This should print the error from the find operation and NOT crash the script
 
 if __name__ == "__main__":
   main()
