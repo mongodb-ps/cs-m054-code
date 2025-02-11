@@ -14,12 +14,12 @@ except ImportError as e:
 
 # PUT VALUES HERE!
 
-MDB_PASSWORD = <UPDATE_HERE> 
+MDB_PASSWORD = "SuperP@ssword123!" 
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 TLSKEYCERT_PATH = "/data/pki/client-0.pem"
-SHARED_LIB_PATH = <UPDATE_HERE> # absolute path of the `crypt_shared` library file
-KMIP_ADDR = <UPDATE_HERE> # Update for KMIP address and port, e.g. `hostname:port`
+SHARED_LIB_PATH = '/data/lib/mongo_crypt_v1.so'
+KMIP_ADDR = "kmip-0:5696"
 
 def main():
 

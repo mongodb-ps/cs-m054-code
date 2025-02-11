@@ -13,11 +13,11 @@ except ImportError as e:
 
 
 # PUT VALUES HERE!
-MDB_PASSWORD = <UPDATE_HERE> 
-APP_USER = "app_user"
-CA_PATH = "/data/pki/ca.pem"
-TLSKEYCERT_PATH = "/data/pki/client-0.pem"
-KMIP_ADDR = <UPDATE_HERE> # Update for KMIP address and port, e.g. `hostname:port`
+MDB_PASSWORD = <UPDATE_HERE>
+APP_USER = <UPDATE_HERE>
+CA_PATH = <UPDATE_HERE>
+TLSKEYCERT_PATH = <UPDATE_HERE>
+KMIP_ADDR = <UPDATE_HERE>
 
 def main():
 

@@ -15,7 +15,7 @@ import sys
 
 # PUT VALUES HERE!
 
-MDB_PASSWORD = <UPDATE_HERE> 
+MDB_PASSWORD = "SuperP@ssword123!" 
 APP_USER = "app_user"
 CA_PATH = "/data/pki/ca.pem"
 
