@@ -144,6 +144,11 @@ def main():
       print(f"Error creating role: {e}")
       sys.exit()
 
+  client["__encryption"]["__keyVault"].create_index("keyAltNames", unique=True, partialFilterExpression={
+    	"keyAltNames": {
+      	"$exists": True
+      }})
+  
   # Instantiate our ClientEncryption object
   client_encryption = ClientEncryption(
     kms_provider_details,

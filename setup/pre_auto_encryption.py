@@ -146,6 +146,11 @@ def main():
   )
   client.admin.command("createUser", APP_USER, pwd=MDB_PASSWORD, roles=["cryptoClient", {"role": "readWrite", "db": encrypted_db_name}])
 
+  client["__encryption"]["__keyVault"].create_index("keyAltNames", unique=True, partialFilterExpression={
+    	"keyAltNames": {
+      	"$exists": True
+      }})
+  
   # Instantiate our ClientEncryption object
   client_encryption = ClientEncryption(
     kms_provider_details,
