@@ -249,7 +249,7 @@ def main():
     if data_key_id_1 is None:
       data_key_id_1, err = make_dek(client_encryption, "dataKey1", provider, "1")
       if err is not None:
-        print("Failed to find DEK")
+        print(f"Failed to find DEK: {err}")
         sys.exit()
     else:
       data_key_id_1 = data_key_id_1["_id"]
