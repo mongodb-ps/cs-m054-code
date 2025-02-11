@@ -202,6 +202,7 @@ def main():
   print(f"Find result: {result}")
 
   result = mdb.delete_one(keyvault_db, keyvault_coll, {"keyAltNames": employee_id})
+  assert result.deleted_count == 1
   print("DEK deleted")
   result = mdb.encrypted_find_one(encrypted_db_name, encrypted_coll_name, {"name.firstName": firstname, "name.lastName": lastname})
   print(f"Post DEK delete result: {result}")

@@ -198,18 +198,19 @@ def main():
   result = mdb.encrypted_insert_one(encrypted_db_name, encrypted_coll_name, payload)
   print(f"Insert _id: {result.inserted_id}")
 
-  result = mdb.<UPDATE_HERE> # PUT CODE HERE TO RETRIEVE DOCUMENT
+  result = mdb.<UPDATE_HERE> # PUT CODE HERE TO RETRIEVE DOCUMENT using methods in the MDB class
   print(f"Find result: {result}")
 
-  # WRITE CODE TO DELETE EMPLOYEE's DEK HERE
+  # WRITE CODE TO DELETE EMPLOYEE's DEK HERE using methods in the MDB class
   result =  mdb.<UPDATE_HERE>
+  assert result.deleted_count == 1
   print("DEK deleted")
-  result = mdb.<UPDATE_HERE> # PUT CODE HERE TO RETRIEVE DOCUMENT
+  result = mdb.<UPDATE_HERE> # PUT CODE HERE TO RETRIEVE DOCUMENT using methods in the MDB class
   print(f"Post DEK delete result: {result}")
 
   sleep(60)
 
-  result =  mdb.<UPDATE_HERE> # PUT CODE HERE TO RETRIEVE DOCUMENT!
+  result =  mdb.<UPDATE_HERE> # PUT CODE HERE TO RETRIEVE DOCUMENT using methods in the MDB class
   print(result) # This should print the error from the find operation and NOT crash the script
 
 if __name__ == "__main__":
