@@ -114,9 +114,6 @@ def main():
     db = client[keyvault_db]
     coll = db[keyvault_coll]
 
-    result = coll.create_index("keyAltNames", unique=True)
-    print(result)
-
     # Create role and user
     client.admin.command("createRole", "cryptoClient",  privileges=[
       {
@@ -145,7 +142,7 @@ def main():
       print(f"Error creating role: {e}")
       sys.exit()
 
-  client["__encryption"]["__keyVault"].create_index("keyAltNames", unique=True, partialFilterExpression={
+  coll.create_index("keyAltNames", unique=True, partialFilterExpression={
     	"keyAltNames": {
       	"$exists": True
       }})
