@@ -11,6 +11,7 @@ try:
   from urllib.parse import quote_plus
   import sys
 except ImportError as e:
+  from os import path
   print(f"Import error for {path.basename(__file__)}: {e}")
   exit(1)
 

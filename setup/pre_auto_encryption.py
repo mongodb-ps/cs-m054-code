@@ -12,6 +12,7 @@ try:
   import names
   import sys
 except ImportError as e:
+  from os import path
   print(f"Import error for {path.basename(__file__)}: {e}")
   exit(1)
 
@@ -170,9 +171,10 @@ def main():
     print("Failed to find DEK")
     sys.exit()
 
-  db = client["companyData"]
-  db.create_collection("employee", validator={
-    "$jsonSchema": {
+  encrypted_db_name = "companyData"
+  encrypted_coll_name = "employee"
+  schema_map = {
+    "companyData.employee": {
       "bsonType": "object",
       "encryptMetadata": {
         "keyId": [data_key_id_1],
@@ -229,7 +231,11 @@ def main():
       }
     }
   }
-)
+  db = client[encrypted_db_name]
+  db.create_collection(encrypted_coll_name, validator={
+    "$jsonSchema": schema_map["companyData.employee"]
+})
+  
 
 if __name__ == "__main__":
   main()

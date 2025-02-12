@@ -12,6 +12,7 @@ try:
   import names
   import sys
 except ImportError as e:
+  from os import path
   print(f"Import error for {path.basename(__file__)}: {e}")
   exit(1)
 
@@ -259,41 +260,10 @@ def main():
       }
     }
   }
-  db = client["companyData"]
-  db.create_collection("employee", validator={
+  db = client[encrypted_db_name]
+  db.create_collection(encrypted_coll_name, validator={
     "$jsonSchema": schema_map["companyData.employee"]
 })
-
-		
-  auto_encryption = AutoEncryptionOpts(
-    kms_provider_details,
-    keyvault_namespace,
-    schema_map = schema_map,
-    kms_tls_options = {
-      "kmip": {
-        "tlsCAFile": "/data/pki/ca.pem",
-        "tlsCertificateKeyFile": "/data/pki/server.pem"
-      }
-    },
-    crypt_shared_lib_required = True,
-    mongocryptd_bypass_spawn = True,
-    crypt_shared_lib_path = '/data/lib/mongo_crypt_v1.so'
-  )
-
-  secure_client, err = mdb_client(connection_string, auto_encryption_opts=auto_encryption)
-  if err is not None:
-    print(err)
-    sys.exit(1)
-
-  if payload["name"]["otherNames"] is None:
-    del(payload["name"]["otherNames"])
-
-  try:
-    result = secure_client[encrypted_db_name][encrypted_coll_name].insert_one(payload)
-    print(result.inserted_id)
-
-  except EncryptionError as e:
-    print(f"Encryption error: {e}")
-
+  
 if __name__ == "__main__":
   main()
