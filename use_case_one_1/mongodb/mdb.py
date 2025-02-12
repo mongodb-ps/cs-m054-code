@@ -69,7 +69,7 @@ class MDB:
       return None, f"Cannot connect to database, please check settings in config file: {e}"
   
   def create_client_encryption(self) -> Union[str, None]:
-    """ Create and return a ClientEncryption object for MongoDB client-side field level encryption, or return an error message if 
+    """ Create a ClientEncryption object for MongoDB client-side field level encryption, or return an error message if 
     the provided CA file or TLS key certificate file does not exist.
 
     Parameters from class
