@@ -128,9 +128,9 @@ class MDB:
       if not self.__client_encryption:
         raise f"ClientEncryption object is not instantiated"
       if algorithm == ALG.RAND:
-        alg = <UPDATE_HERE> # Use th4e Algoirthm library to set the right algorithm for Random
+        alg = <UPDATE_HERE> # Use the Algoirthm library to set the right algorithm for Random
       else:
-        alg = <UPDATE_HERE> # Use th4e Algoirthm library to set the right algorithm for Deterministic
+        alg = <UPDATE_HERE> # Use the Algoirthm library to set the right algorithm for Deterministic
       return self.__client_encryption.<UPDATE_HERE> # Perform the encryption
     except EncryptionError as e:
       raise e
