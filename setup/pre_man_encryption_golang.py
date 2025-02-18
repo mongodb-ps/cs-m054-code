@@ -114,9 +114,6 @@ def main():
     db = client[keyvault_db]
     coll = db[keyvault_coll]
 
-    result = coll.create_index("keyAltNames", unique=True)
-    print(result)
-
     # Create role and user
     client.admin.command("createRole", "cryptoClient",  privileges=[
       {
