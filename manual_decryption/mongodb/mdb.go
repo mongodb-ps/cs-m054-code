@@ -131,7 +131,7 @@ func (m *MDBType) DecryptManual(d bson.M) (bson.M, error) {
 
 // function to decrypt a single value with the ClientEncryption instance
 func (m *MDBType) DecryptField(d primitive.Binary) (bson.RawValue, error) {
-	out, err := m.clientEncryption.Decrypt(context.TODO(), d)
+	out, err := m.clientEncryption.<UPDATE_HERE> (context.TODO(), d)
 	if err != nil {
 		return bson.RawValue{}, err
 	}
