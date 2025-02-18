@@ -103,7 +103,7 @@ func (m *MDBType) CreateManualEncryptionClient() error {
 }
 
 // Function to perform the manual encryption with the ClientEncryption instance
-func (m *MDBType) EncryptManual(dek primitive.Binary, alg string, data interface{}) (primitive.Binary, error) {
+func (m *MDBType) EncryptField(dek primitive.Binary, alg string, data interface{}) (primitive.Binary, error) {
 	var out primitive.Binary
 	rawValueType, rawValueData, err := bson.MarshalValue(data)
 	if err != nil {
@@ -130,7 +130,7 @@ func (m *MDBType) DecryptManual(d bson.M) (bson.M, error) {
 }
 
 // function to decrypt a single value with the ClientEncryption instance
-func (m *MDBType) DecryptValueManual(d primitive.Binary) (bson.RawValue, error) {
+func (m *MDBType) DecryptField(d primitive.Binary) (bson.RawValue, error) {
 	out, err := m.clientEncryption.Decrypt(context.TODO(), d)
 	if err != nil {
 		return bson.RawValue{}, err
@@ -159,7 +159,7 @@ func (m *MDBType) traverseBson(d bson.M) (bson.M, error) {
 				continue
 			}
 			if i.Subtype == 6 {
-				data, err := m.DecryptValueManual(i)
+				data, err := m.DecryptField(i)
 				if err != nil {
 					return bson.M{}, err
 				}

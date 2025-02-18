@@ -23,6 +23,7 @@ func main() {
 		keySpace         = keyVaultDB + "." + keyVaultColl
 		caFile           = "/data/pki/ca.pem"
 		keyCertFile      = "/data/pki/client-0.pem"
+		kmipEndpoint     = "kmip-0:5696"
 		username         = "app_user"
 		password         = "SuperP@ssword123!"
 		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
@@ -45,7 +46,7 @@ func main() {
 	provider := "kmip"
 	kmsProvider := map[string]map[string]interface{}{
 		provider: {
-			"endpoint": "kmip-0:5696",
+			"endpoint": kmipEndpoint,
 		},
 	}
 
@@ -111,7 +112,7 @@ func main() {
 
 	// Encrypt the payload
 	for _, field := range detFields {
-		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", utils.GetField(payload, field))
+		tempVal, err := mdb.EncryptField(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", utils.GetField(payload, field))
 		if err != nil {
 			fmt.Printf("ClientEncrypt error: %s\n", err)
 			exitCode = 1
@@ -121,7 +122,7 @@ func main() {
 	}
 
 	for _, field := range randFields {
-		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", utils.GetField(payload, field))
+		tempVal, err := mdb.EncryptField(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", utils.GetField(payload, field))
 		if err != nil {
 			fmt.Printf("ClientEncrypt error: %s\n", err)
 			exitCode = 1
@@ -133,7 +134,7 @@ func main() {
 	// remove the otherNames field if it is nil or encrypted
 	middleName := utils.GetField(payload, "name.otherNames")
 	if middleName != nil {
-		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", middleName)
+		tempVal, err := mdb.EncryptField(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", middleName)
 		if err != nil {
 			fmt.Printf("ClientEncrypt error: %s\n", err)
 			exitCode = 1
@@ -161,7 +162,7 @@ func main() {
 	}
 	fmt.Print(result.InsertedID)
 
-	encryptedName, err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", "Kuber")
+	encryptedName, err = mdb.EncryptField(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", "Kuber")
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
