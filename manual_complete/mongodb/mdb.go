@@ -31,7 +31,8 @@ func NewMDB(
 	p string,
 	caFile string,
 	kp map[string]map[string]interface{},
-	kns string, tlsOps map[string]*tls.Config,
+	kns string,
+	tlsOps map[string]*tls.Config,
 ) (*MDBType, error) {
 	var err error
 	mdb := MDBType{
@@ -169,12 +170,9 @@ func (m *MDBType) traverseBson(d bson.M) (bson.M, error) {
 	return d, nil
 }
 
-func (m *MDBType) Get_dek_uuid(dek string) (primitive.Binary, error) {
+func (m *MDBType) GetDEKUUID(dek string) (primitive.Binary, error) {
 	var dekFindResult bson.M
-	coll := m.client.Database(m.keyVaultNameSpace).Collection(m.keyVaultNameSpace)
-	filter := bson.M{"keyAltNames": dek}
-	opts := options.FindOne().SetProjection(bson.M{"_id": 1})
-	err := coll.FindOne(context.Background(), filter, opts).Decode(&dekFindResult)
+	err := m.clientEncryption.GetKeyByAltName(context.Background(), dek).Decode(&dekFindResult)
 	if err != nil {
 		return primitive.Binary{}, err
 	}

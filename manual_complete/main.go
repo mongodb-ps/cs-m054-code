@@ -7,11 +7,9 @@ import (
 	"os"
 	"time"
 
-	mdb "sde/manual_complete/mongodb"
-	"sde/manual_complete/utils"
+	mdb "sde/csfle/mongodb"
+	"sde/csfle/utils"
 
-	"github.com/tidwall/gjson"
-	"github.com/tidwall/sjson"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -31,7 +29,6 @@ func main() {
 		exitCode         = 0
 		kmipTLSConfig    *tls.Config
 		result           *mongo.InsertOneResult
-		dekFindResult    bson.M
 		dek              primitive.Binary
 		encryptedName    primitive.Binary
 		findResult       bson.M
@@ -101,8 +98,8 @@ func main() {
 	}
 
 	// Retrieve our DEK or fail if missing
-	dek, err = mdb.Get_dek_uuid("dataKey1")
-	if err != nil || len(dekFindResult) == 0 {
+	dek, err = mdb.GetDEKUUID("dataKey1")
+	if err != nil || dek.Data == nil {
 		fmt.Printf("DEK find error: %s\n", err)
 		exitCode = 1
 		return
@@ -114,106 +111,42 @@ func main() {
 
 	// Encrypt the payload
 	for _, field := range detFields {
-		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", gjson.Get(payload, field))
+		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", utils.GetField(payload, field))
 		if err != nil {
 			fmt.Printf("ClientEncrypt error: %s\n", err)
 			exitCode = 1
 			return
 		}
-		sjson.Set(payload, field, tempVal)
+		utils.SetField(payload, field, tempVal)
 	}
 
 	for _, field := range randFields {
-		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", gjson.Get(payload, field))
+		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", utils.GetField(payload, field))
 		if err != nil {
 			fmt.Printf("ClientEncrypt error: %s\n", err)
 			exitCode = 1
 			return
 		}
-		sjson.Set(payload, field, tempVal)
+		utils.SetField(payload, field, tempVal)
 	}
 
 	// remove the otherNames field if it is nil or encrypted
-	middleName := gjson.Get(payload, "name.otherNames")
-	if middleName.Exists() {
+	middleName := utils.GetField(payload, "name.otherNames")
+	if middleName != nil {
 		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", middleName)
 		if err != nil {
 			fmt.Printf("ClientEncrypt error: %s\n", err)
 			exitCode = 1
 			return
 		}
-		sjson.Set(payload, "name.otherNames", tempVal)
+		utils.SetField(payload, "name.otherNames", tempVal)
 	} else {
-		sjson.Delete(payload, "name.otherNames")
+		utils.DeleteField(payload, "name.otherNames")
 	}
-	/*
-		name := payload["name"].(bson.M)
-		if name["otherNames"] == nil {
-			fmt.Println("Removing nil")
-			delete(name, "otherNames")
-		} else {
-			name["otherNames"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", name["otherNames"])
-			if err != nil {
-				fmt.Printf("ClientEncrypt error: %s\n", err)
-				exitCode = 1
-				return
-			}
-		}
-
-		name["firstName"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["firstName"])
-		if err != nil {
-			fmt.Printf("ClientEncrypt error: %s\n", err)
-			exitCode = 1
-			return
-		}
-
-		name["lastName"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["lastName"])
-		if err != nil {
-			fmt.Printf("ClientEncrypt error: %s\n", err)
-			exitCode = 1
-			return
-		}
-		payload["name"] = name
-
-		payload["address"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["address"])
-		if err != nil {
-			fmt.Printf("ClientEncrypt error: %s\n", err)
-			exitCode = 1
-			return
-		}
-
-		payload["dob"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["dob"])
-		if err != nil {
-			fmt.Printf("ClientEncrypt error: %s\n", err)
-			exitCode = 1
-			return
-		}
-
-		payload["phoneNumber"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["phoneNumber"])
-		if err != nil {
-			fmt.Printf("ClientEncrypt error: %s\n", err)
-			exitCode = 1
-			return
-		}
-
-		payload["salary"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["salary"])
-		if err != nil {
-			fmt.Printf("ClientEncrypt error: %s\n", err)
-			exitCode = 1
-			return
-		}
-
-		payload["taxIdentifier"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["taxIdentifier"])
-		if err != nil {
-			fmt.Printf("ClientEncrypt error: %s\n", err)
-			exitCode = 1
-			return
-		}
-	*/
 
 	// test to see if all our fields are encrypted:
 	for _, field := range allEncryptedFields {
-		if !utils.TestEncrypted(gjson.Get(payload, field)) {
+		if !utils.TestEncrypted(utils.GetField(payload, field)) {
 			fmt.Printf("Field %s is not encrypted\n", field)
 			exitCode = 1
 			return
