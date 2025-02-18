@@ -2,127 +2,21 @@ package main
 
 import (
 	"C"
-	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"os"
 	"time"
 
+	mdb "sde/manual_complete/mongodb"
+	"sde/manual_complete/utils"
+
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-func createClient(c string, u string, p string, caFile string) (*mongo.Client, error) {
-	//auth setup
-	creds := options.Credential{
-		Username:      u,
-		Password:      p,
-		AuthMechanism: "SCRAM-SHA-256",
-	}
-
-	// TLS setup
-	caCert, err := os.ReadFile(caFile)
-	if err != nil {
-		return nil, err
-	}
-	caCertPool := x509.NewCertPool()
-	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
-		return nil, fmt.Errorf("failed to append CA certificate")
-	}
-
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
-	}
-
-	// instantiate client
-	opts := options.Client().ApplyURI(c).SetAuth(creds).SetTLSConfig(tlsConfig)
-	client, err := mongo.Connect(context.TODO(), opts)
-	if err != nil {
-		return nil, err
-	}
-	err = client.Ping(context.Background(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-// Function to create the MognoDB ClientEncryption instance
-func createManualEncryptionClient(c *mongo.Client, kp map[string]map[string]interface{}, kns string, tlsOps map[string]*tls.Config) (*mongo.ClientEncryption, error) {
-	o := options.ClientEncryption().SetKeyVaultNamespace(kns).SetKmsProviders(kp).SetTLSConfig(tlsOps)
-	client, err := mongo.NewClientEncryption(c, o)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-// Function to perform the manual encryption
-func encryptManual(ce *mongo.ClientEncryption, dek primitive.Binary, alg string, data interface{}) (primitive.Binary, error) {
-	var out primitive.Binary
-	rawValueType, rawValueData, err := bson.MarshalValue(data)
-	if err != nil {
-		return primitive.Binary{}, err
-	}
-
-	rawValue := bson.RawValue{Type: rawValueType, Value: rawValueData}
-
-	encryptionOpts := options.Encrypt().
-		SetAlgorithm(alg).
-		SetKeyID(dek)
-
-	out, err = ce.Encrypt(context.TODO(), rawValue, encryptionOpts)
-	if err != nil {
-		return primitive.Binary{}, err
-	}
-
-	return out, nil
-}
-
-func decryptManual(c *mongo.ClientEncryption, d primitive.Binary) (bson.RawValue, error) {
-	out, err := c.Decrypt(context.TODO(), d)
-	if err != nil {
-		return bson.RawValue{}, err
-	}
-
-	return out, nil
-}
-
-// Function that traverses a BSON object and determines if the type is a primitive,
-// if so, we check if this is a binary subtype 6 and then call the manual decrypt function
-// to decrypt the value. We call the same function if arrays or subdocuments are found
-func traverseBson(c *mongo.ClientEncryption, d bson.M) (bson.M, error) {
-	for k, v := range d {
-		a, ok := v.(primitive.M)
-		if ok {
-			data, err := traverseBson(c, a)
-			if err != nil {
-				return bson.M{}, err
-			}
-			d[k] = data
-		} else {
-			// Check if binary Subtype 6 data, e.g. encrypted. Skip if it is not
-			i, ok := v.(primitive.Binary)
-			if !ok {
-				// not binary data
-				continue
-			}
-			if i.Subtype == 6 {
-				data, err := decryptManual(c, i)
-				if err != nil {
-					return bson.M{}, err
-				}
-				d[k] = data
-			}
-		}
-	}
-	return d, nil
-}
 
 func main() {
 	var (
@@ -130,11 +24,10 @@ func main() {
 		keyVaultColl     = "__keyVault"
 		keySpace         = keyVaultDB + "." + keyVaultColl
 		caFile           = "/data/pki/ca.pem"
+		keyCertFile      = "/data/pki/client-0.pem"
 		username         = "app_user"
 		password         = "SuperP@ssword123!"
 		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
-		clientEncryption *mongo.ClientEncryption
-		client           *mongo.Client
 		exitCode         = 0
 		kmipTLSConfig    *tls.Config
 		result           *mongo.InsertOneResult
@@ -144,6 +37,8 @@ func main() {
 		findResult       bson.M
 		outputData       bson.M
 		err              error
+		encryptedDB      = "companyData"
+		encryptedColl    = "employee"
 	)
 
 	defer func() {
@@ -157,20 +52,11 @@ func main() {
 		},
 	}
 
-	client, err = createClient(connectionString, username, password, caFile)
-	if err != nil {
-		fmt.Printf("MDB client error: %s\n", err)
-		exitCode = 1
-		return
-	}
-
-	coll := client.Database("__encryption").Collection("__keyVault")
-
 	// Set the KMIP TLS options
 	kmsTLSOptions := make(map[string]*tls.Config)
 	tlsOptions := map[string]interface{}{
-		"tlsCAFile":             "/data/pki/ca.pem",
-		"tlsCertificateKeyFile": "/data/pki/client-0.pem",
+		"tlsCAFile":             caFile,
+		"tlsCertificateKeyFile": keyCertFile,
 	}
 	kmipTLSConfig, err = options.BuildTLSConfig(tlsOptions)
 	if err != nil {
@@ -180,7 +66,14 @@ func main() {
 	}
 	kmsTLSOptions["kmip"] = kmipTLSConfig
 
-	clientEncryption, err = createManualEncryptionClient(client, kmsProvider, keySpace, kmsTLSOptions)
+	mdb, err := mdb.NewMDB(connectionString, username, password, caFile, kmsProvider, keySpace, kmsTLSOptions)
+	if err != nil {
+		fmt.Printf("MDB client error: %s\n", err)
+		exitCode = 1
+		return
+	}
+
+	err = mdb.CreateManualEncryptionClient()
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
@@ -207,83 +100,127 @@ func main() {
 		"role":          []string{"DEV"},
 	}
 
-	// Retrieve our DEK
-	opts := options.FindOne().SetProjection(bson.D{{Key: "_id", Value: 1}})
-	err = coll.FindOne(context.TODO(), bson.D{{Key: "keyAltNames", Value: "dataKey1"}}, opts).Decode(&dekFindResult)
+	// Retrieve our DEK or fail if missing
+	dek, err = mdb.Get_dek_uuid("dataKey1")
 	if err != nil || len(dekFindResult) == 0 {
 		fmt.Printf("DEK find error: %s\n", err)
 		exitCode = 1
 		return
 	}
-	dek = dekFindResult["_id"].(primitive.Binary)
 
-	// remove the otherNames field if it is nil
-	name := payload["name"].(bson.M)
-	if name["otherNames"] == nil {
-		fmt.Println("Removing nil")
-		delete(name, "otherNames")
-	} else {
-		name["otherNames"], err = encryptManual(clientEncryption, dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", name["otherNames"])
+	detFields := []string{"name.firstName", "name.lastName"}
+	randFields := []string{"address", "dob", "phoneNumber", "salary", "taxIdentifier"}
+	allEncryptedFields := append(detFields, randFields...)
+
+	// Encrypt the payload
+	for _, field := range detFields {
+		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", gjson.Get(payload, field))
 		if err != nil {
 			fmt.Printf("ClientEncrypt error: %s\n", err)
 			exitCode = 1
 			return
 		}
+		sjson.Set(payload, field, tempVal)
 	}
 
-	name["firstName"], err = encryptManual(clientEncryption, dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["firstName"])
-	if err != nil {
-		fmt.Printf("ClientEncrypt error: %s\n", err)
-		exitCode = 1
-		return
+	for _, field := range randFields {
+		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", gjson.Get(payload, field))
+		if err != nil {
+			fmt.Printf("ClientEncrypt error: %s\n", err)
+			exitCode = 1
+			return
+		}
+		sjson.Set(payload, field, tempVal)
 	}
 
-	name["lastName"], err = encryptManual(clientEncryption, dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["lastName"])
-	if err != nil {
-		fmt.Printf("ClientEncrypt error: %s\n", err)
-		exitCode = 1
-		return
+	// remove the otherNames field if it is nil or encrypted
+	middleName := gjson.Get(payload, "name.otherNames")
+	if middleName.Exists() {
+		tempVal, err := mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", middleName)
+		if err != nil {
+			fmt.Printf("ClientEncrypt error: %s\n", err)
+			exitCode = 1
+			return
+		}
+		sjson.Set(payload, "name.otherNames", tempVal)
+	} else {
+		sjson.Delete(payload, "name.otherNames")
 	}
-	payload["name"] = name
+	/*
+		name := payload["name"].(bson.M)
+		if name["otherNames"] == nil {
+			fmt.Println("Removing nil")
+			delete(name, "otherNames")
+		} else {
+			name["otherNames"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", name["otherNames"])
+			if err != nil {
+				fmt.Printf("ClientEncrypt error: %s\n", err)
+				exitCode = 1
+				return
+			}
+		}
 
-	payload["address"], err = encryptManual(clientEncryption, dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["address"])
-	if err != nil {
-		fmt.Printf("ClientEncrypt error: %s\n", err)
-		exitCode = 1
-		return
+		name["firstName"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["firstName"])
+		if err != nil {
+			fmt.Printf("ClientEncrypt error: %s\n", err)
+			exitCode = 1
+			return
+		}
+
+		name["lastName"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", name["lastName"])
+		if err != nil {
+			fmt.Printf("ClientEncrypt error: %s\n", err)
+			exitCode = 1
+			return
+		}
+		payload["name"] = name
+
+		payload["address"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["address"])
+		if err != nil {
+			fmt.Printf("ClientEncrypt error: %s\n", err)
+			exitCode = 1
+			return
+		}
+
+		payload["dob"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["dob"])
+		if err != nil {
+			fmt.Printf("ClientEncrypt error: %s\n", err)
+			exitCode = 1
+			return
+		}
+
+		payload["phoneNumber"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["phoneNumber"])
+		if err != nil {
+			fmt.Printf("ClientEncrypt error: %s\n", err)
+			exitCode = 1
+			return
+		}
+
+		payload["salary"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["salary"])
+		if err != nil {
+			fmt.Printf("ClientEncrypt error: %s\n", err)
+			exitCode = 1
+			return
+		}
+
+		payload["taxIdentifier"], err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["taxIdentifier"])
+		if err != nil {
+			fmt.Printf("ClientEncrypt error: %s\n", err)
+			exitCode = 1
+			return
+		}
+	*/
+
+	// test to see if all our fields are encrypted:
+	for _, field := range allEncryptedFields {
+		if !utils.TestEncrypted(gjson.Get(payload, field)) {
+			fmt.Printf("Field %s is not encrypted\n", field)
+			exitCode = 1
+			return
+		}
 	}
 
-	payload["dob"], err = encryptManual(clientEncryption, dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["dob"])
-	if err != nil {
-		fmt.Printf("ClientEncrypt error: %s\n", err)
-		exitCode = 1
-		return
-	}
-
-	payload["phoneNumber"], err = encryptManual(clientEncryption, dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["phoneNumber"])
-	if err != nil {
-		fmt.Printf("ClientEncrypt error: %s\n", err)
-		exitCode = 1
-		return
-	}
-
-	payload["salary"], err = encryptManual(clientEncryption, dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["salary"])
-	if err != nil {
-		fmt.Printf("ClientEncrypt error: %s\n", err)
-		exitCode = 1
-		return
-	}
-
-	payload["taxIdentifier"], err = encryptManual(clientEncryption, dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Random", payload["taxIdentifier"])
-	if err != nil {
-		fmt.Printf("ClientEncrypt error: %s\n", err)
-		exitCode = 1
-		return
-	}
-
-	coll = client.Database("companyData").Collection("employee")
-
-	result, err = coll.InsertOne(context.TODO(), payload)
+	result, err = mdb.InsertOne(encryptedDB, encryptedColl, payload)
 	if err != nil {
 		fmt.Printf("Insert error: %s\n", err)
 		exitCode = 1
@@ -291,13 +228,13 @@ func main() {
 	}
 	fmt.Print(result.InsertedID)
 
-	encryptedName, err = encryptManual(clientEncryption, dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", "Kuber")
+	encryptedName, err = mdb.EncryptManual(dek, "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic", "Kuber")
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
 		return
 	}
-	err = coll.FindOne(context.TODO(), bson.M{"name.firstName": encryptedName}).Decode(&findResult)
+	findResult, err = mdb.FindOne(encryptedDB, encryptedColl, bson.M{"name.firstName": encryptedName})
 	if err != nil {
 		fmt.Printf("MongoDB find error: %s\n", err)
 		exitCode = 1
@@ -310,7 +247,7 @@ func main() {
 	}
 	fmt.Printf("%+v\n", findResult)
 
-	outputData, err = traverseBson(clientEncryption, findResult)
+	outputData, err = mdb.DecryptManual(findResult)
 	if err != nil {
 		fmt.Printf("Encryption error: %s\n", err)
 		exitCode = 1
