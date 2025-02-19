@@ -13,8 +13,8 @@ import (
 	utils "sde/csfle/utils"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo/"
-	"go.mongodb.org/mongo-driver/v2/mongo//options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func main() {
@@ -41,9 +41,9 @@ func main() {
 		os.Exit(exitCode)
 	}()
 
-	provider := "kmip"
+	providerName := "kmip"
 	kmsProvider := map[string]map[string]interface{}{
-		provider: {
+		providerName: {
 			"endpoint": kmipEndpoint,
 		},
 	}
@@ -66,7 +66,7 @@ func main() {
 	}
 	kmsTLSOptions["kmip"] = kmipTLSConfig
 
-	mdb, err := mdb.NewMDB(connectionString, username, password, caFile, kmsProvider, keySpace, kmsTLSOptions, cryptSharedPath)
+	mdb, err := mdb.NewMDB(connectionString, username, password, caFile, providerName, kmsProvider, keySpace, kmsTLSOptions, cryptSharedPath)
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
@@ -87,7 +87,7 @@ func main() {
 	employeeDEK, err = mdb.GetDEK(id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			employeeDEK, err = mdb.CreateDEK(provider, cmk, id)
+			employeeDEK, err = mdb.CreateDEK(cmk, id)
 			if err != nil {
 				fmt.Printf("Cannot create employee DEK: %s\n", err)
 				exitCode = 1
@@ -208,7 +208,7 @@ func main() {
 	}
 	payload["name"] = name
 
-	result, err = mdb.EncryptedInsertOne.InsertOne(encryptedDB, encryptedColl, payload)
+	result, err = mdb.EncryptedInsertOne(encryptedDB, encryptedColl, payload)
 	if err != nil {
 		fmt.Printf("Insert error: %s\n", err)
 		exitCode = 1
@@ -216,7 +216,7 @@ func main() {
 	}
 	fmt.Println(result.InsertedID)
 
-	err = mdb.EncryptedFindOne(encryptedDB, encryptedColl, bson.M{"name.firstName": encryptedFirstName}).Decode(&findResult)
+	findResult, err = mdb.EncryptedFindOne(encryptedDB, encryptedColl, bson.M{"name.firstName": encryptedFirstName})
 	if err != nil {
 		fmt.Printf("MongoDB find error: %s\n", err)
 		exitCode = 1

@@ -22,6 +22,7 @@ type MDBType struct {
 	username              string
 	password              string
 	caFile                string
+	keyProviderName       string
 	keyProvider           map[string]map[string]interface{}
 	keyVaultNameSpace     string
 	keyProviderTLSOptions map[string]*tls.Config
@@ -34,6 +35,7 @@ func NewMDB(
 	u string,
 	p string,
 	caFile string,
+	kpn string,
 	kp map[string]map[string]interface{},
 	kns string,
 	tlsOps map[string]*tls.Config,
@@ -47,6 +49,7 @@ func NewMDB(
 		username:              u,
 		password:              p,
 		caFile:                caFile,
+		keyProviderName:       kpn,
 		keyProvider:           kp,
 		keyVaultNameSpace:     kns,
 		keyProviderTLSOptions: tlsOps,
@@ -274,7 +277,7 @@ func (m *MDBType) CreateDEK(cmk map[string]interface{}, altName string) (bson.Bi
 	cOpts := options.DataKey().
 		SetMasterKey(cmk).
 		SetKeyAltNames([]string{altName})
-	dek, err := m.clientEncryption.CreateDataKey(context.TODO(), m.keyProvider, cOpts)
+	dek, err := m.clientEncryption.CreateDataKey(context.TODO(), m.keyProviderName, cOpts)
 	if err != nil {
 		return bson.Binary{}, err
 	}
