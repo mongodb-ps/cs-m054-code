@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -21,6 +22,7 @@ type MDBType struct {
 	username              string
 	password              string
 	caFile                string
+	keyProviderName       string
 	keyProvider           map[string]map[string]interface{}
 	keyVaultNameSpace     string
 	keyProviderTLSOptions map[string]*tls.Config
@@ -33,6 +35,7 @@ func NewMDB(
 	u string,
 	p string,
 	caFile string,
+	kpn string,
 	kp map[string]map[string]interface{},
 	kns string,
 	tlsOps map[string]*tls.Config,
@@ -46,6 +49,7 @@ func NewMDB(
 		username:              u,
 		password:              p,
 		caFile:                caFile,
+		keyProviderName:       kpn,
 		keyProvider:           kp,
 		keyVaultNameSpace:     kns,
 		keyProviderTLSOptions: tlsOps,
@@ -267,4 +271,33 @@ func (m *MDBType) EncryptedFindOne(db string, coll string, filter bson.M) (bson.
 	}
 
 	return findResult, nil
+}
+
+func (m *MDBType) CreateDEK(cmk map[string]interface{}, altName string) (bson.Binary, error) {
+	cOpts := options.DataKey().
+		<UPDATE_HERE>(cmk).
+		<UPDATE_HERE>([]string{altName})
+	dek, err := m.clientEncryption.<UPDATE_HERE>
+	if err != nil {
+		return bson.Binary{}, err
+	}
+
+	return dek, nil
+}
+
+func (m *MDBType) GetDEK(altName string) (bson.Binary, error) {
+	var dekFindResult bson.M
+
+	err := m.clientEncryption.GetKeyByAltName(context.TODO(), altName).Decode(&dekFindResult)
+	if err != nil {
+		return bson.Binary{}, err
+	}
+	if len(dekFindResult) == 0 {
+		return bson.Binary{}, nil
+	}
+	b, ok := dekFindResult["_id"].(bson.Binary)
+	if !ok {
+		return bson.Binary{}, errors.New("the DEK conversion error")
+	}
+	return b, nil
 }
