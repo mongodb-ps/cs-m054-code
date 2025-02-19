@@ -7,7 +7,7 @@ import (
 )
 
 func TestEncrypted(field interface{}) bool {
-	binaryField, ok := field.(Binary)
+	binaryField, ok := field.(bson.Binary)
 	if !ok || (ok && binaryField.Subtype != 6) {
 		return false
 	}
