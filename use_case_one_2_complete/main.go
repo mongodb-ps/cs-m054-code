@@ -10,6 +10,7 @@ import (
 	"time"
 
 	mdb "sde/csfle/mongodb"
+	utils "sde/csfle/utils"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -27,6 +28,7 @@ func main() {
 		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
 		err              error
 		exitCode         = 0
+		dek              bson.Binary
 		findResult       bson.M
 		keyVaultColl     = "__keyVault"
 		keyVaultDB       = "__encryption"
@@ -99,7 +101,7 @@ func main() {
 		}
 	}
 
-	firstname, lastname := nameGenerator()
+	firstname, lastname := utils.NameGenerator()
 	payload := bson.M{
 		"_id": id,
 		"name": bson.M{
@@ -234,7 +236,7 @@ func main() {
 	}
 	fmt.Println(result.InsertedID)
 
-	findResult, err = mdb.EncryptedFindOne(encryptedDB, encryptedColl, bson.M{"name.firstName": encryptedFirstName})
+	findResult, err = mdb.EncryptedFindOne(encryptedDB, encryptedColl, bson.M{"name.firstName": firstname})
 	if err != nil {
 		fmt.Printf("MongoDB find error: %s\n", err)
 		exitCode = 1
