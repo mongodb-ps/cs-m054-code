@@ -31,7 +31,6 @@ func main() {
 		exitCode         = 0
 		kmipTLSConfig    *tls.Config
 		result           *mongo.InsertOneResult
-		findResult       bson.M
 		dek              bson.Binary
 		err              error
 		encryptedDB      = "companyData"
