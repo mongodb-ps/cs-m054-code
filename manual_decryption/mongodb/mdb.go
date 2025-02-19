@@ -78,7 +78,7 @@ func (m *MDBType) createClient() error {
 
 	// instantiate client
 	opts := options.Client().ApplyURI(m.connectionString).SetAuth(creds).SetTLSConfig(tlsConfig)
-	m.client, err = mongo.Connect(context.TODO(), opts)
+	m.client, err = mongo.Connect(opts)
 	if err != nil {
 		return err
 	}
