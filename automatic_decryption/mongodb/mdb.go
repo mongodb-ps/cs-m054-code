@@ -6,16 +6,17 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
+	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-
-	"go.mongodb.org/mongo-driver/v2/mongo/"
-	"go.mongodb.org/mongo-driver/v2/mongo//options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type MDBType struct {
 	client                *mongo.Client
 	clientEncryption      *mongo.ClientEncryption
+	encryptedClient       *mongo.Client
 	connectionString      string
 	username              string
 	password              string
@@ -23,6 +24,8 @@ type MDBType struct {
 	keyProvider           map[string]map[string]interface{}
 	keyVaultNameSpace     string
 	keyProviderTLSOptions map[string]*tls.Config
+	cryptSharedPath       string
+	ctx                   context.Context
 }
 
 func NewMDB(
@@ -33,8 +36,9 @@ func NewMDB(
 	kp map[string]map[string]interface{},
 	kns string,
 	tlsOps map[string]*tls.Config,
+	csp string,
 ) (*MDBType, error) {
-	var err error
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	mdb := MDBType{
 		client:                nil,
 		clientEncryption:      nil,
@@ -45,16 +49,20 @@ func NewMDB(
 		keyProvider:           kp,
 		keyVaultNameSpace:     kns,
 		keyProviderTLSOptions: tlsOps,
+		cryptSharedPath:       csp,
+		ctx:                   ctx,
 	}
+	var o *options.AutoEncryptionOptions
 
-	err = mdb.createClient()
+	err := mdb.createClient(o)
 	if err != nil {
 		return nil, err
 	}
 	return &mdb, nil
 }
 
-func (m *MDBType) createClient() error {
+func (m *MDBType) createClient(autoEncryptionOpts *options.AutoEncryptionOptions) error {
+	var opts *options.ClientOptions
 	//auth setup
 	creds := options.Credential{
 		Username:      m.username,
@@ -77,16 +85,55 @@ func (m *MDBType) createClient() error {
 	}
 
 	// instantiate client
-	opts := options.Client().ApplyURI(m.connectionString).SetAuth(creds).SetTLSConfig(tlsConfig)
-	m.client, err = mongo.Connect(context.TODO(), opts)
-	if err != nil {
-		return err
-	}
-	err = m.client.Ping(context.Background(), nil)
-	if err != nil {
-		return err
+	if autoEncryptionOpts == nil {
+		opts = options.Client().ApplyURI(m.connectionString).SetAuth(creds).SetTLSConfig(tlsConfig)
+		m.client, err = mongo.Connect(opts)
+		if err != nil {
+			return err
+		}
+		/*defer func() {
+			if err = m.client.Disconnect(m.ctx); err != nil {
+				log.Panic(err)
+			}
+		}()*/
+		err = m.client.Ping(context.Background(), nil)
+		if err != nil {
+			return err
+		}
+	} else {
+		opts = options.Client().ApplyURI(m.connectionString).SetAuth(creds).SetTLSConfig(tlsConfig).SetAutoEncryptionOptions(autoEncryptionOpts)
+		m.encryptedClient, err = mongo.Connect(opts)
+		if err != nil {
+			return err
+		}
+		/*defer func() {
+			if err = m.encryptedClient.Disconnect(m.ctx); err != nil {
+				log.Panic(err)
+			}
+		}()*/
+		err = m.encryptedClient.Ping(context.Background(), nil)
+		if err != nil {
+			return err
+		}
 	}
 
+	return nil
+}
+
+func (m *MDBType) CreateEncryptedClient(schema map[string]interface{}) error {
+
+	autoEncryptionOpts := options.AutoEncryptionOptions{
+		KeyVaultNamespace: m.keyVaultNameSpace,
+		KmsProviders:      m.keyProvider,
+		SchemaMap:         schema,
+		TLSConfig:         m.keyProviderTLSOptions,
+		ExtraOptions:      map[string]interface{}{"mongocryptdSpawnPath": m.cryptSharedPath},
+	}
+
+	err := m.createClient(&autoEncryptionOpts)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -144,7 +191,7 @@ func (m *MDBType) DecryptField(d bson.Binary) (bson.RawValue, error) {
 // to decrypt the value. We call the same function if arrays or subdocuments are found
 func (m *MDBType) traverseBson(d bson.M) (bson.M, error) {
 	for k, v := range d {
-		a, ok := v.(primitive.M)
+		a, ok := v.(bson.M)
 		if ok {
 			data, err := m.traverseBson(a)
 			if err != nil {
@@ -190,10 +237,31 @@ func (m *MDBType) InsertOne(db string, coll string, data interface{}) (*mongo.In
 	return result, nil
 }
 
+func (m *MDBType) EncryptedInsertOne(db string, coll string, data interface{}) (*mongo.InsertOneResult, error) {
+	c := m.encryptedClient.Database(db).Collection(coll)
+	result, err := c.InsertOne(context.TODO(), data)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (m *MDBType) FindOne(db string, coll string, filter bson.M) (bson.M, error) {
 	c := m.client.Database(db).Collection(coll)
 	var findResult bson.M
 	err := c.FindOne(context.Background(), filter).Decode(&findResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return findResult, nil
+}
+
+func (m *MDBType) EncryptedFindOne(db string, coll string, filter bson.M) (bson.M, error) {
+	c := m.encryptedClient.Database(db).Collection(coll)
+	var findResult bson.M
+	err := c.<UPDATE_HERE>.Decode(&findResult)
 	if err != nil {
 		return nil, err
 	}

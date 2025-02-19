@@ -3,12 +3,11 @@ package utils
 import (
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func TestEncrypted(field interface{}) bool {
-	binaryField, ok := field.(primitive.Binary)
+	binaryField, ok := field.(Binary)
 	if !ok || (ok && binaryField.Subtype != 6) {
 		return false
 	}

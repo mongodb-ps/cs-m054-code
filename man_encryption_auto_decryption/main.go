@@ -8,10 +8,10 @@ import (
 	"os"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"go.mongodb.org/mongo-driver/v2/mongo/"
+	"go.mongodb.org/mongo-driver/v2/mongo//options"
 )
 
 func createClient(c string, u string, p string, caFile string) (*mongo.Client, error) {
@@ -82,11 +82,11 @@ func createAutoEncryptionClient(c string, ns string, kms map[string]map[string]i
 	return client, nil
 }
 
-func encryptManual(ce *mongo.ClientEncryption, dek primitive.Binary, alg string, data interface{}) (primitive.Binary, error) {
-	var out primitive.Binary
+func encryptManual(ce *mongo.ClientEncryption, dek Binary, alg string, data interface{}) (Binary, error) {
+	var out Binary
 	rawValueType, rawValueData, err := bson.MarshalValue(data)
 	if err != nil {
-		return primitive.Binary{}, err
+		return Binary{}, err
 	}
 
 	rawValue := bson.RawValue{Type: rawValueType, Value: rawValueData}
@@ -97,7 +97,7 @@ func encryptManual(ce *mongo.ClientEncryption, dek primitive.Binary, alg string,
 
 	out, err = ce.Encrypt(context.TODO(), rawValue, encryptionOpts)
 	if err != nil {
-		return primitive.Binary{}, err
+		return Binary{}, err
 	}
 
 	return out, nil
@@ -119,8 +119,8 @@ func main() {
 		result           *mongo.InsertOneResult
 		dekFindResult    bson.M
 		findResult			 bson.M
-		dek              primitive.Binary
-		encryptedName		primitive.Binary
+		dek              Binary
+		encryptedName		Binary
 		kmipTLSConfig    *tls.Config
 		err							 error
 	)
@@ -205,7 +205,7 @@ func main() {
 		exitCode = 1
 		return
 	}
-	dek = dekFindResult["_id"].(primitive.Binary)
+	dek = dekFindResult["_id"].(Binary)
 
 	// remove the otherNames field if it is nil
 	name := payload["name"].(bson.M)

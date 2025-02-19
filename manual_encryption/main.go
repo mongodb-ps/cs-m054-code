@@ -10,10 +10,10 @@ import (
 	mdb "sde/csfle/mongodb"
 	"sde/csfle/utils"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"go.mongodb.org/mongo-driver/v2/mongo/"
+	"go.mongodb.org/mongo-driver/v2/mongo//options"
 )
 
 func main() {
@@ -30,8 +30,8 @@ func main() {
 		exitCode         = 0
 		kmipTLSConfig    *tls.Config
 		result           *mongo.InsertOneResult
-		dek              primitive.Binary
-		encryptedName    primitive.Binary
+		dek              bson.Binary
+		encryptedName    bson.Binary
 		findResult       bson.M
 		outputData       bson.M
 		err              error

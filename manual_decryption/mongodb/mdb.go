@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"os"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"go.mongodb.org/mongo-driver/v2/mongo/"
+	"go.mongodb.org/mongo-driver/v2/mongo//options"
 )
 
 type MDBType struct {
@@ -103,11 +103,11 @@ func (m *MDBType) CreateManualEncryptionClient() error {
 }
 
 // Function to perform the manual encryption with the ClientEncryption instance
-func (m *MDBType) EncryptField(dek primitive.Binary, alg string, data interface{}) (primitive.Binary, error) {
-	var out primitive.Binary
+func (m *MDBType) EncryptField(dek bson.Binary, alg string, data interface{}) (bson.Binary, error) {
+	var out bson.Binary
 	rawValueType, rawValueData, err := bson.MarshalValue(data)
 	if err != nil {
-		return primitive.Binary{}, err
+		return bson.Binary{}, err
 	}
 
 	rawValue := bson.RawValue{Type: rawValueType, Value: rawValueData}
@@ -118,7 +118,7 @@ func (m *MDBType) EncryptField(dek primitive.Binary, alg string, data interface{
 
 	out, err = m.clientEncryption.Encrypt(context.TODO(), rawValue, encryptionOpts)
 	if err != nil {
-		return primitive.Binary{}, err
+		return bson.Binary{}, err
 	}
 
 	return out, nil
@@ -130,7 +130,7 @@ func (m *MDBType) DecryptManual(d bson.M) (bson.M, error) {
 }
 
 // function to decrypt a single value with the ClientEncryption instance
-func (m *MDBType) DecryptField(d primitive.Binary) (bson.RawValue, error) {
+func (m *MDBType) DecryptField(d bson.Binary) (bson.RawValue, error) {
 	out, err := m.clientEncryption.<UPDATE_HERE> (context.TODO(), d)
 	if err != nil {
 		return bson.RawValue{}, err
@@ -140,7 +140,7 @@ func (m *MDBType) DecryptField(d primitive.Binary) (bson.RawValue, error) {
 }
 
 // Function that traverses a BSON object and determines if the type is a primitive,
-// if so, we check if this is a binary subtype 6 and then call the manual decrypt function
+// if so, we check if this is a bson.Binary subtype 6 and then call the manual decrypt function
 // to decrypt the value. We call the same function if arrays or subdocuments are found
 func (m *MDBType) traverseBson(d bson.M) (bson.M, error) {
 	for k, v := range d {
@@ -152,10 +152,10 @@ func (m *MDBType) traverseBson(d bson.M) (bson.M, error) {
 			}
 			d[k] = data
 		} else {
-			// Check if binary Subtype 6 data, e.g. encrypted. Skip if it is not
-			i, ok := v.(primitive.Binary)
+			// Check if bson.Binary Subtype 6 data, e.g. encrypted. Skip if it is not
+			i, ok := v.(bson.Binary)
 			if !ok {
-				// not binary data
+				// not bson.Binary data
 				continue
 			}
 			if i.Subtype == 6 {
@@ -170,14 +170,14 @@ func (m *MDBType) traverseBson(d bson.M) (bson.M, error) {
 	return d, nil
 }
 
-func (m *MDBType) GetDEKUUID(dek string) (primitive.Binary, error) {
+func (m *MDBType) GetDEKUUID(dek string) (bson.Binary, error) {
 	var dekFindResult bson.M
 	err := m.clientEncryption.GetKeyByAltName(context.Background(), dek).Decode(&dekFindResult)
 	if err != nil {
-		return primitive.Binary{}, err
+		return bson.Binary{}, err
 	}
 
-	return dekFindResult["_id"].(primitive.Binary), nil
+	return dekFindResult["_id"].(bson.Binary), nil
 }
 
 func (m *MDBType) InsertOne(db string, coll string, data interface{}) (*mongo.InsertOneResult, error) {

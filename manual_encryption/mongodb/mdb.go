@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"os"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"go.mongodb.org/mongo-driver/v2/mongo/"
+	"go.mongodb.org/mongo-driver/v2/mongo//options"
 )
 
 type MDBType struct {
@@ -103,11 +103,11 @@ func (m *MDBType) CreateManualEncryptionClient() error {
 }
 
 // Function to perform the manual encryption with the ClientEncryption instance
-func (m *MDBType) EncryptField(dek primitive.Binary, alg string, data interface{}) (primitive.Binary, error) {
-	var out primitive.Binary
+func (m *MDBType) EncryptField(dek bson.Binary, alg string, data interface{}) (bson.Binary, error) {
+	var out bson.Binary
 	rawValueType, rawValueData, err := bson.MarshalValue(data)
 	if err != nil {
-		return primitive.Binary{}, err
+		return bson.Binary{}, err
 	}
 
 	rawValue := bson.RawValue{Type: rawValueType, Value: rawValueData}
@@ -118,20 +118,20 @@ func (m *MDBType) EncryptField(dek primitive.Binary, alg string, data interface{
 
 	out, err = m.clientEncryption.<UPDATE_HERE>(context.TODO(), rawValue, encryptionOpts)
 	if err != nil {
-		return primitive.Binary{}, err
+		return bson.Binary{}, err
 	}
 
 	return out, nil
 }
 
-func (m *MDBType) GetDEKUUID(dek string) (primitive.Binary, error) {
+func (m *MDBType) GetDEKUUID(dek string) (bson.Binary, error) {
 	var dekFindResult bson.M
 	err := m.clientEncryption.<UPDATE_HERE>.Decode(&dekFindResult)
 	if err != nil {
-		return primitive.Binary{}, err
+		return bson.Binary{}, err
 	}
 
-	return dekFindResult["_id"].(primitive.Binary), nil
+	return dekFindResult["_id"].(bson.Binary), nil
 }
 
 func (m *MDBType) InsertOne(db string, coll string, data interface{}) (*mongo.InsertOneResult, error) {

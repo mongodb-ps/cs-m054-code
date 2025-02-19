@@ -13,10 +13,10 @@ import (
 	"time"
 	"encoding/base64"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+
+	"go.mongodb.org/mongo-driver/v2/mongo/"
+	"go.mongodb.org/mongo-driver/v2/mongo//options"
 	"github.com/goombaio/namegenerator"
 )
 
@@ -66,9 +66,9 @@ func createAutoEncryptionClient(c string, ns string, kms map[string]map[string]i
 	return client, nil
 }
 
-func createDEK(c *mongo.ClientEncryption, kn string, cmk map[string]interface{}, altName string) (primitive.Binary, error) {
+func createDEK(c *mongo.ClientEncryption, kn string, cmk map[string]interface{}, altName string) (Binary, error) {
 	var (
-		dek primitive.Binary
+		dek Binary
 		err error
 	)
 
@@ -77,30 +77,30 @@ func createDEK(c *mongo.ClientEncryption, kn string, cmk map[string]interface{},
 		SetKeyAltNames([]string{altName})
 	dek, err = c.CreateDataKey(context.TODO(), kn, cOpts)
 	if err != nil {
-		return primitive.Binary{}, err
+		return Binary{}, err
 	}
 
 	return dek, nil
 }
 
-func getDEK(c *mongo.ClientEncryption, altName string) (primitive.Binary, error) {
+func getDEK(c *mongo.ClientEncryption, altName string) (Binary, error) {
 	var dekFindResult bson.M
 
 	err := c.GetKeyByAltName(context.TODO(), altName).Decode(&dekFindResult)
 	if err != nil {
-		return primitive.Binary{}, err
+		return Binary{}, err
 	}
 	if len(dekFindResult) == 0 {
-		return primitive.Binary{}, nil
+		return Binary{}, nil
 	}
-	b, ok := dekFindResult["_id"].(primitive.Binary)
+	b, ok := dekFindResult["_id"].(Binary)
 	if !ok {
-		return primitive.Binary{}, errors.New("the DEK conversion error")
+		return Binary{}, errors.New("the DEK conversion error")
 	}
 	return b, nil
 }
 
-func trashDEK(c *mongo.ClientEncryption, kp map[string]map[string]interface{}, kns string, keyID primitive.Binary) error {
+func trashDEK(c *mongo.ClientEncryption, kp map[string]map[string]interface{}, kns string, keyID Binary) error {
 	var (
 		delResult *mongo.DeleteResult
 		err       error
@@ -134,8 +134,8 @@ func main() {
 		client           *mongo.Client
 		clientEncryption *mongo.ClientEncryption
 		connectionString = "mongodb://app_user:" + MDB_PASSWORD + "@mongodb-0:27017/?replicaSet=rs0&tls=true&tlsCAFile=%2Fdata%2Fpki%2Fca.pem"
-		dek              primitive.Binary
-		employeeDEK      primitive.Binary
+		dek              Binary
+		employeeDEK      Binary
 		encryptedClient  *mongo.Client
 		err							 error
 		exitCode         = 0
