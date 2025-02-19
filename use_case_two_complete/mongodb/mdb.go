@@ -22,6 +22,7 @@ type MDBType struct {
 	username              string
 	password              string
 	caFile                string
+	keyProviderName       string
 	keyProvider           map[string]map[string]interface{}
 	keyVaultNameSpace     string
 	keyProviderTLSOptions map[string]*tls.Config
@@ -34,6 +35,7 @@ func NewMDB(
 	u string,
 	p string,
 	caFile string,
+	kpn string,
 	kp map[string]map[string]interface{},
 	kns string,
 	tlsOps map[string]*tls.Config,
@@ -47,6 +49,7 @@ func NewMDB(
 		username:              u,
 		password:              p,
 		caFile:                caFile,
+		keyProviderName:       kpn,
 		keyProvider:           kp,
 		keyVaultNameSpace:     kns,
 		keyProviderTLSOptions: tlsOps,
@@ -146,6 +149,9 @@ func (m *MDBType) CreateManualEncryptionClient() error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = m.clientEncryption.Close(context.TODO())
+	}()
 
 	return nil
 }
@@ -274,4 +280,52 @@ func (m *MDBType) EncryptedFindOne(db string, coll string, filter bson.M) (bson.
 	}
 
 	return findResult, nil
+}
+
+func (m *MDBType) CreateDEK(cmk map[string]interface{}, altName string) (bson.Binary, error) {
+	cOpts := options.DataKey().
+		SetMasterKey(cmk).
+		SetKeyAltNames([]string{altName})
+	dek, err := m.clientEncryption.CreateDataKey(context.TODO(), m.keyProviderName, cOpts)
+	if err != nil {
+		return bson.Binary{}, err
+	}
+
+	return dek, nil
+}
+
+func (m *MDBType) GetDEK(altName string) (bson.Binary, error) {
+	var dekFindResult bson.M
+
+	err := m.clientEncryption.GetKeyByAltName(context.TODO(), altName).Decode(&dekFindResult)
+	if err != nil {
+		return bson.Binary{}, err
+	}
+	if len(dekFindResult) == 0 {
+		return bson.Binary{}, nil
+	}
+	b, ok := dekFindResult["_id"].(bson.Binary)
+	if !ok {
+		return bson.Binary{}, errors.New("the DEK conversion error")
+	}
+	return b, nil
+}
+
+func (m *MDBType) DeleteDEK(altName string) error {
+	keyID, err := m.GetDEK(altName)
+	if err != nil {
+		return err
+	}
+	if keyID.Data == nil {
+		return nil
+	}
+	delResult, err := m.clientEncryption.DeleteKey(context.TODO(), keyID)
+	if err != nil {
+		return err
+	}
+	if delResult.DeletedCount == 0 {
+		return errors.New("no DEK deleted")
+	}
+
+	return nil
 }

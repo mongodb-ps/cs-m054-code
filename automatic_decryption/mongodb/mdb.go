@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -223,8 +224,14 @@ func (m *MDBType) GetDEKUUID(dek string) (bson.Binary, error) {
 	if err != nil {
 		return bson.Binary{}, err
 	}
-
-	return dekFindResult["_id"].(bson.Binary), nil
+	if len(dekFindResult) == 0 {
+		return bson.Binary{}, nil
+	}
+	b, ok := dekFindResult["_id"].(bson.Binary)
+	if !ok {
+		return bson.Binary{}, errors.New("DEK conversion error")
+	}
+	return b, nil
 }
 
 func (m *MDBType) InsertOne(db string, coll string, data interface{}) (*mongo.InsertOneResult, error) {

@@ -149,6 +149,9 @@ func (m *MDBType) CreateManualEncryptionClient() error {
 	if err != nil {
 		return err
 	}
+	/*defer func() {
+		_ = m.clientEncryption.Close(context.TODO())
+	}()*/
 
 	return nil
 }
@@ -227,8 +230,14 @@ func (m *MDBType) GetDEKUUID(dek string) (bson.Binary, error) {
 	if err != nil {
 		return bson.Binary{}, err
 	}
-
-	return dekFindResult["_id"].(bson.Binary), nil
+	if len(dekFindResult) == 0 {
+		return bson.Binary{}, nil
+	}
+	b, ok := dekFindResult["_id"].(bson.Binary)
+	if !ok {
+		return bson.Binary{}, errors.New("the DEK conversion error")
+	}
+	return b, nil
 }
 
 func (m *MDBType) InsertOne(db string, coll string, data interface{}) (*mongo.InsertOneResult, error) {
