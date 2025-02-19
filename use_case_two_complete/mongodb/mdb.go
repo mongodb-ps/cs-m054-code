@@ -149,9 +149,9 @@ func (m *MDBType) CreateManualEncryptionClient() error {
 	if err != nil {
 		return err
 	}
-	defer func() {
+	/*defer func() {
 		_ = m.clientEncryption.Close(context.TODO())
-	}()
+	}()*/
 
 	return nil
 }
