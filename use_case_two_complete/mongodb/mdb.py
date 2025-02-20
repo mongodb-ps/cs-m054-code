@@ -9,7 +9,7 @@ try:
   from pymongo import MongoClient
   from pymongo.encryption import Algorithm
   from pymongo.encryption import ClientEncryption
-  from pymongo.results import InsertOneResult, DeleteResult, FindOneResult
+  from pymongo.results import InsertOneResult, DeleteResult
   from pymongo.errors import EncryptionError, ServerSelectionTimeoutError, ConnectionFailure, OperationFailure
 except ImportError as e:
   from os import path
@@ -301,7 +301,7 @@ class MDB:
         sys.exit(1)
     return None
 
-  def delete_dek(self, dek_alt_name: str) -> Union[None, InsertOneResult]:
+  def delete_dek(self, dek_alt_name: str) -> Union[None, DeleteResult]:
     """ Delete a DEK
 
     Parameters
@@ -315,6 +315,6 @@ class MDB:
     """
     dek = self.__client_encryption.get_key_by_alt_name(dek_alt_name)
     if dek:
-      result = self.__client_encryption.delete_data_key(dek)
+      result = self.__client_encryption.delete_key(dek)
       return result
     return None
