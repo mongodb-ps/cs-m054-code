@@ -145,7 +145,7 @@ func (m *MDBType) DecryptField(d bson.Binary) (bson.RawValue, error) {
 // to decrypt the value. We call the same function if arrays or subdocuments are found
 func (m *MDBType) traverseBson(d bson.M) (bson.M, error) {
 	for k, v := range d {
-		a, ok := v.(primitive.M)
+		a, ok := v.(bson.M)
 		if ok {
 			data, err := m.traverseBson(a)
 			if err != nil {
