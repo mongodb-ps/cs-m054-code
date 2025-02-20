@@ -269,7 +269,7 @@ func main() {
 	schemaMap := `{
 		"bsonType": "object",
 		"encryptMetadata": {
-			"keyId": ,// put your JOSN pointer here,
+			"keyId": <UPDATE_HERE>,// put your JSON pointer here,
 			"algorithm": "AEAD_AES_256_CBC_HMAC_SHA_512-Random"
 		},
 		"properties": {
@@ -281,7 +281,7 @@ func main() {
 							"keyId": [ 
 								{
 									"$binary": {
-										"base64": "` + base64.StdEncoding.EncodeToString(/* PUT YOUR COMMON KEY HERE */.Data) + `",
+										"base64": "` + base64.StdEncoding.EncodeToString(<UPDATE_HERE>.Data) + `",
 										"subType": "04"
 									}
 								}
@@ -295,7 +295,7 @@ func main() {
 							"keyId": [ 
 								{
 									"$binary": {
-										"base64": "` + base64.StdEncoding.EncodeToString(/* PUT YOUR COMMON KEY HERE */.Data) + `",
+										"base64": "` + base64.StdEncoding.EncodeToString(<UPDATE_HERE>.Data) + `",
 										"subType": "04"
 									}
 								}
