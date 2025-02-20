@@ -2,186 +2,50 @@ package main
 
 import (
 	"C"
-	"context"
 	"crypto/tls"
-	"crypto/x509"
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/goombaio/namegenerator"
-	"go.mongodb.org/mongo-driver/v2/bson"
+	mdb "sde/csfle/mongodb"
+	utils "sde/csfle/utils"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
-
-func createClient(c string, u string, p string, caFile string) (*mongo.Client, error) {
-	//auth setup
-	creds := options.Credential{
-		Username:      u,
-		Password:      p,
-		AuthMechanism: "SCRAM-SHA-256",
-	}
-
-	// TLS setup
-	caCert, err := os.ReadFile(caFile)
-	if err != nil {
-		return nil, err
-	}
-	caCertPool := x509.NewCertPool()
-	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
-		return nil, fmt.Errorf("failed to append CA certificate")
-	}
-
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
-	}
-
-	// instantiate client
-	opts := options.Client().ApplyURI(c).SetAuth(creds).SetTLSConfig(tlsConfig)
-	client, err := mongo.Connect(context.TODO(), opts)
-	if err != nil {
-		return nil, err
-	}
-	err = client.Ping(context.Background(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-func createAutoEncryptionClient(c string, u string, p string, caFile string, ns string, kms map[string]map[string]interface{}, tlsOps map[string]*tls.Config, s bson.M) (*mongo.Client, error) { //auth setup
-	creds := options.Credential{
-		Username:      u,
-		Password:      p,
-		AuthMechanism: "SCRAM-SHA-256",
-	}
-
-	// TLS setup
-	caCert, err := os.ReadFile(caFile)
-	if err != nil {
-		return nil, err
-	}
-	caCertPool := x509.NewCertPool()
-	if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
-		return nil, fmt.Errorf("failed to append CA certificate")
-	}
-
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
-	}
-
-	autoEncryptionOpts := options.AutoEncryption().
-		SetKeyVaultNamespace(ns).
-		SetKmsProviders(kms).
-		SetSchemaMap(s).
-		SetTLSConfig(tlsOps)
-
-	client, err := mongo.Connect(
-		context.TODO(),
-		options.Client().ApplyURI(c).SetAutoEncryptionOptions(autoEncryptionOpts).SetAuth(creds).SetTLSConfig(tlsConfig),
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-func createManualEncryptionClient(c *mongo.Client, kp map[string]map[string]interface{}, kns string, tlsOps map[string]*tls.Config) (*mongo.ClientEncryption, error) {
-	o := options.ClientEncryption().SetKeyVaultNamespace(kns).SetKmsProviders(kp).SetTLSConfig(tlsOps)
-	client, err := mongo.NewClientEncryption(c, o)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
-func createDEK(c *mongo.ClientEncryption, kn string, cmk map[string]interface{}, altName string) (Binary, error) {
-	var (
-		dek Binary
-		err error
-	)
-
-	cOpts := options.DataKey().
-		SetMasterKey(cmk).
-		SetKeyAltNames([]string{altName})
-	dek, err = c.CreateDataKey(context.TODO(), kn, cOpts)
-	if err != nil {
-		return Binary{}, err
-	}
-
-	return dek, nil
-}
-
-func getDEK(c *mongo.ClientEncryption, altName string) (Binary, error) {
-	var dekFindResult bson.M
-
-	err := c.GetKeyByAltName(context.TODO(), altName).Decode(&dekFindResult)
-	if err != nil {
-		return Binary{}, err
-	}
-	if len(dekFindResult) == 0 {
-		return Binary{}, nil
-	}
-	b, ok := dekFindResult["_id"].(Binary)
-	if !ok {
-		return Binary{}, errors.New("the DEK conversion error")
-	}
-	return b, nil
-}
-
-func nameGenerator()(string, string) {
-	seed := time.Now().UTC().UnixNano()
-	nameGenerator := namegenerator.NewNameGenerator(seed)
-
-	name := nameGenerator.Generate()
-
-	firstName := strings.Split(name, "-")[0]
-	lastName := strings.Split(name, "-")[1]
-
-	return firstName, lastName
-}
+import "encoding/base64"
 
 func main() {
 	var (
 		caFile           = "/data/pki/ca.pem"
 		username         = "app_user"
-		password         = <UPDATE_HERE>
-		client           *mongo.Client
-		encryptedClient  *mongo.Client
-		clientEncryption *mongo.ClientEncryption
+		password         = "SuperP@ssword123!"
+		kmipEndpoint     = "kmip-0:5696"
+		cryptSharedPath  = "/data/lib/mongo_crypt_v1.so"
 		connectionString = "mongodb://mongodb-0:27017/?replicaSet=rs0&tls=true"
-		dek              Binary
-		employeeDEK      Binary
-		encryptedClient  *mongo.Client
-		err							 error
+		err              error
 		exitCode         = 0
-		findResult			 bson.M
-		keyVaultColl 		 = "__keyVault"
-		keyVaultDB 			 = "__encryption"
-		
+		dek              bson.Binary
+		findResult       bson.M
+		keyVaultColl     = "__keyVault"
+		keyVaultDB       = "__encryption"
 		kmipTLSConfig    *tls.Config
 		result           *mongo.InsertOneResult
-		delResult 			 *mongo.DeleteResult
+		encryptedDB      = "companyData"
+		encryptedColl    = "employee"
 	)
 
 	defer func() {
 		os.Exit(exitCode)
 	}()
 
-	provider := "kmip"
+	providerName := "kmip"
 	kmsProvider := map[string]map[string]interface{}{
-		provider: {
-			"endpoint": <UPDATE_HERE>
+		providerName: {
+			"endpoint": kmipEndpoint,
 		},
 	}
 	cmk := map[string]interface{}{
@@ -189,17 +53,10 @@ func main() {
 	}
 	keySpace := keyVaultDB + "." + keyVaultColl
 
-	client, err = createClient(connectionString, username, password, caFile)
-	if err != nil {
-		fmt.Printf("MDB client error: %s\n", err)
-		exitCode = 1
-		return
-	}
-
 	// Set the KMIP TLS options
 	kmsTLSOptions := make(map[string]*tls.Config)
 	tlsOptions := map[string]interface{}{
-		"tlsCAFile": "/data/pki/ca.pem",
+		"tlsCAFile":             "/data/pki/ca.pem",
 		"tlsCertificateKeyFile": "/data/pki/client-0.pem",
 	}
 	kmipTLSConfig, err = options.BuildTLSConfig(tlsOptions)
@@ -209,8 +66,15 @@ func main() {
 		return
 	}
 	kmsTLSOptions["kmip"] = kmipTLSConfig
-	
-	clientEncryption, err = createManualEncryptionClient(client, username, password, caFile, kmsProvider, keySpace, kmsTLSOptions)
+
+	mdb, err := mdb.NewMDB(connectionString, username, password, caFile, providerName, kmsProvider, keySpace, kmsTLSOptions, cryptSharedPath)
+	if err != nil {
+		fmt.Printf("ClientEncrypt error: %s\n", err)
+		exitCode = 1
+		return
+	}
+
+	err = mdb.CreateManualEncryptionClient()
 	if err != nil {
 		fmt.Printf("ClientEncrypt error: %s\n", err)
 		exitCode = 1
@@ -221,10 +85,10 @@ func main() {
 	id := strconv.Itoa(int(rand.Intn(100000)))
 
 	// get our employee DEK or create
-	employeeDEK, err = getDEK(clientEncryption, id)
+	_, err = mdb.GetDEKUUID(id)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			employeeDEK, err = createDEK(clientEncryption, provider, cmk, id)
+			_, err = mdb.CreateDEK(cmk, id)
 			if err != nil {
 				fmt.Printf("Cannot create employee DEK: %s\n", err)
 				exitCode = 1
@@ -236,40 +100,37 @@ func main() {
 			return
 		}
 	}
-	
-	firstname, lastname := nameGenerator()
-  payload := bson.M{
-		"_id": id,
-    "name": bson.M{
-      "firstName": firstname,
-      "lastName": lastname,
-      "otherNames": nil,
-    },
-    "address": bson.M{
-      "streetAddress": "29 Bson Street",
-      "suburbCounty": "Mongoville",
-      "stateProvince": "Victoria",
-      "zipPostcode": "3999",
-      "country": "Oz",
-    },
-    "dob": time.Date(1999, 1, 12, 0, 0, 0, 0, time.Local),
-    "phoneNumber": "1800MONGO",
-    "salary": 999999.99,
-    "taxIdentifier": "78SDSSWN001",
-    "role": []string{"Student"},
-  }
 
-	// Retrieve our DEK
-	dek, err = getDEK(clientEncryption, "dataKey1")
-	if err != nil {
+	firstname, lastname := utils.NameGenerator()
+	payload := bson.M{
+		"_id": id,
+		"name": bson.M{
+			"firstName":  firstname,
+			"lastName":   lastname,
+			"otherNames": nil,
+		},
+		"address": bson.M{
+			"streetAddress": "29 Bson Street",
+			"suburbCounty":  "Mongoville",
+			"stateProvince": "Victoria",
+			"zipPostcode":   "3999",
+			"country":       "Oz",
+		},
+		"dob":           time.Date(1999, 1, 12, 0, 0, 0, 0, time.Local),
+		"phoneNumber":   "1800MONGO",
+		"salary":        999999.99,
+		"taxIdentifier": "78SDSSWN001",
+		"role":          []string{"Student"},
+	}
+
+	// Retrieve our DEK or fail if missing
+	dek, err = mdb.GetDEKUUID("dataKey1")
+	if err != nil || dek.Data == nil {
 		fmt.Printf("DEK find error: %s\n", err)
 		exitCode = 1
 		return
 	}
 
-	db := "companyData"
-	collection := "employee"
-	
 	schemaMap := `{
 		"bsonType": "object",
 		"encryptMetadata": {
@@ -350,16 +211,15 @@ func main() {
 		fmt.Printf("Unmarshal Error: %s\n", err)
 	}
 	completeMap := map[string]interface{}{
-		db + "." + collection: testSchema,
+		encryptedDB + "." + encryptedColl: testSchema,
 	}
-	encryptedClient, err = createAutoEncryptionClient(connectionString, keySpace, kmsProvider, kmsTLSOptions, completeMap)
+
+	err = mdb.CreateEncryptedClient(completeMap)
 	if err != nil {
 		fmt.Printf("MDB encrypted client error: %s\n", err)
 		exitCode = 1
 		return
 	}
-
-	encryptedColl := encryptedClient.Database(db).Collection(collection)
 
 	// remove the otherNames field if it is nil
 	name := payload["name"].(bson.M)
@@ -368,29 +228,59 @@ func main() {
 		delete(name, "otherNames")
 	}
 
-	result, err = encryptedColl.InsertOne(context.TODO(), payload)
+	result, err = mdb.EncryptedInsertOne(encryptedDB, encryptedColl, payload)
 	if err != nil {
 		fmt.Printf("Insert error: %s\n", err)
 		exitCode = 1
 		return
 	}
-	fmt.Print(result.InsertedID)
+	fmt.Println(result.InsertedID)
 
-	err = // PUT CODE HERE TO RETRIEVE DOCUMENT
-	fmt.Printf("%+v\n", findResult)
-
-	delResult, err = // PUT CODE HERE TO DELETE DEK
+	findResult, err = mdb.<UPDATE_HERE> // PUT CODE HERE TO RETRIEVE DOCUMENT using methods in the mdb instance
 	if err != nil {
-		fmt.Printf("Delete error: %s\n", err)
+		fmt.Printf("MongoDB find error: %s\n", err)
 		exitCode = 1
 		return
 	}
-	if delResult.DeletedCount == 0 {
-		fmt.Println("no DEK deleted")
+	if len(findResult) == 0 {
+		fmt.Println("Cannot find document")
+		exitCode = 1
+		return
 	}
-	// PUT SLEEP HERE FOR 60 SECONDS
+	fmt.Printf("%+v\n", findResult)
 
-	err = // PUT CODE HERE TO RETRIEVE DOCUMENT, REMEMBER TO HANDLE ERRORS!
+	err = mdb.<UPDATE_HERE> // PUT CODE HERE TO DELETE the employee DEK using methods in the mdb instance
+	if err != nil {
+		fmt.Printf("DEK deletion error: %s", err)
+	}
+
+	findResult, err = mdb.<UPDATE_HERE> // PUT CODE HERE TO RETRIEVE DOCUMENT using methods in the mdb instance
+	if err != nil {
+		fmt.Printf("MongoDB find error: %s\n", err)
+		exitCode = 1
+		return
+	}
+	if len(findResult) == 0 {
+		fmt.Println("Cannot find document")
+		exitCode = 1
+		return
+	}
+	fmt.Printf("%+v\n", findResult)
+
+	// Sleep for 61 seconds
+	time.Sleep(61 * time.Second)
+
+	findResult, err = mdb.<UPDATE_HERE> // PUT CODE HERE TO RETRIEVE DOCUMENT using methods in the mdb instance
+	if err != nil {
+		fmt.Printf("MongoDB find error: %s\n", err)
+		exitCode = 1
+		return
+	}
+	if len(findResult) == 0 {
+		fmt.Println("Cannot find document")
+		exitCode = 1
+		return
+	}
 	fmt.Printf("%+v\n", findResult)
 
 	exitCode = 0

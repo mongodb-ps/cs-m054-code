@@ -254,6 +254,19 @@ func main() {
 		fmt.Printf("DEK deletion error: %s", err)
 	}
 
+	findResult, err = mdb.EncryptedFindOne(encryptedDB, encryptedColl, bson.M{"name.firstName": firstname})
+	if err != nil {
+		fmt.Printf("MongoDB find error: %s\n", err)
+		exitCode = 1
+		return
+	}
+	if len(findResult) == 0 {
+		fmt.Println("Cannot find document")
+		exitCode = 1
+		return
+	}
+	fmt.Printf("%+v\n", findResult)
+
 	// Sleep for 61 seconds
 	time.Sleep(61 * time.Second)
 
