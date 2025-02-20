@@ -315,6 +315,6 @@ class MDB:
     """
     dek = self.__client_encryption.get_key_by_alt_name(dek_alt_name)
     if dek:
-      result = self.__client_encryption.delete_key(dek)
+      result = self.__client_encryption.delete_key(dek["_id"])
       return result
     return None

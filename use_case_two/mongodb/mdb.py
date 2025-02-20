@@ -313,7 +313,7 @@ class MDB:
       Delete result: value
         Result or None
     """
-    dek = self.__client_encryption.get_key_by_alt_name(dek_alt_name)
+    dek = self.__client_encryption.get_key_by_alt_name(dek_alt_name["_id"])
     if dek:
       result = self.__client_encryption.delete_key(dek)
       return result
