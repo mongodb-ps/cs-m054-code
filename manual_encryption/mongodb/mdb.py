@@ -131,7 +131,7 @@ class MDB:
         alg = <UPDATE_HERE> # Use the Algorithm library to set the right algorithm for Random
       else:
         alg = <UPDATE_HERE> # Use the Algorithm library to set the right algorithm for Deterministic
-      return self.__client_encryption.<UPDATE_HERE> # Perform the encryption
+      return self.__client_encryption.<UPDATE_HERE> # Perform the encryption with the ClientEncryption instance
     except EncryptionError as e:
       raise e
     
